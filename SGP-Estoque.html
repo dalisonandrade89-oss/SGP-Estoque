@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SGP Estoque — Presenças, Tarefas e Prêmio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<style>
+  :root{
+    --bg:#F6F4EE;
+    --surface:#FFFFFF;
+    --surface-2:#FBFAF6;
+    --ink:#20262B;
+    --ink-soft:#5B6570;
+    --ink-faint:#8B939B;
+    --line:#E3E0D4;
+    --sidebar:#1B2024;
+    --sidebar-line:#2C3238;
+    --sidebar-ink:#C7CCD1;
+    --sidebar-ink-dim:#7C868F;
+    --amber:#F0A500;
+    --amber-ink:#3A2900;
+    --amber-deep:#C6870A;
+    --steel:#2E6C86;
+    --olive:#5C7A3D;
+    --rust:#B23A2E;
+    --radius:3px;
+    --shadow:0 1px 2px rgba(20,22,24,.06), 0 4px 14px rgba(20,22,24,.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+  h1,h2,h3,.display{
+    font-family:'Oswald', sans-serif;
+    font-weight:600;
+    letter-spacing:.02em;
+    margin:0;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  button, select, input, textarea{font-family:inherit; font-size:inherit; color:inherit;}
+  :focus-visible{outline:2px solid var(--steel); outline-offset:2px;}
+
+  .stripe{
+    height:6px;
+    background:repeating-linear-gradient(135deg, var(--amber) 0 10px, var(--sidebar) 10px 20px);
+  }
+
+  /* ---------- layout ---------- */
+  .app{display:flex; min-height:100vh;}
+  .sidebar{
+    width:230px; flex-shrink:0;
+    background:var(--sidebar); color:var(--sidebar-ink);
+    display:flex; flex-direction:column;
+  }
+  .sidebar-head{padding:20px 18px 16px;}
+  .top-status{
+    display:flex; align-items:center; gap:7px; font-size:11px; color:var(--sidebar-ink);
+    margin-bottom:12px; padding:6px 10px; border:1px solid var(--sidebar-line); border-radius:20px;
+    background:rgba(255,255,255,.02); width:fit-content;
+  }
+  .top-status.clickable{cursor:pointer;}
+  .top-status.clickable:hover{border-color:var(--amber);}
+  .brand-highlight{
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; font-weight:700; letter-spacing:.06em;
+    color:#4DA3FF; margin-bottom:10px;
+  }
+  .sidebar-head .tag{
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; letter-spacing:.14em;
+    color:var(--amber); text-transform:uppercase; display:block; margin-bottom:6px;
+  }
+  .sidebar-head h1{color:#fff; font-size:19px; line-height:1.15; text-transform:uppercase;}
+  .sidebar nav{flex:1; padding:6px 10px; display:flex; flex-direction:column; gap:2px;}
+  .nav-item{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px; border-radius:var(--radius);
+    color:var(--sidebar-ink-dim); text-decoration:none; cursor:pointer;
+    border:none; background:transparent; text-align:left; width:100%;
+    font-size:13.5px; font-weight:500;
+    border-left:3px solid transparent;
+  }
+  .nav-item .ic{width:16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:12px;}
+  .nav-item:hover{color:var(--sidebar-ink); background:rgba(255,255,255,.04);}
+  .nav-item.active{color:#fff; background:rgba(240,165,0,.08); border-left-color:var(--amber);}
+  .sidebar-foot{padding:14px 18px 18px; border-top:1px solid var(--sidebar-line); display:flex; flex-direction:column; gap:12px;}
+  .sidebar-foot .store-label{font-size:10.5px; color:var(--sidebar-ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; display:block;}
+  .sidebar-foot .backup-btns{display:flex; gap:6px;}
+  .ghost-btn{
+    flex:1; background:transparent; border:1px solid var(--sidebar-line); color:var(--sidebar-ink);
+    padding:7px 6px; border-radius:var(--radius); cursor:pointer; font-size:11px; font-weight:500;
+  }
+  .ghost-btn:hover{border-color:var(--amber); color:#fff;}
+
+  /* ---------- zona de perigo: resetar dados ---------- */
+  .danger-zone{margin-top:14px; padding-top:14px; border-top:1px solid var(--sidebar-line);}
+  .slide-unlock{
+    position:relative; height:38px; background:rgba(255,255,255,.03);
+    border:1px solid var(--sidebar-line); border-radius:20px; overflow:hidden; user-select:none;
+  }
+  .slide-label{
+    position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center;
+    font-size:10px; color:var(--sidebar-ink-dim); letter-spacing:.03em; pointer-events:none; text-transform:uppercase;
+  }
+  .slide-thumb{
+    position:absolute; left:2px; top:2px; width:34px; height:34px; border-radius:50%;
+    background:var(--rust); color:#fff; display:flex; align-items:center; justify-content:center;
+    cursor:grab; font-size:14px; touch-action:none; box-shadow:0 1px 3px rgba(0,0,0,.3);
+  }
+  .slide-thumb:active{cursor:grabbing;}
+  .slide-unlock.unlocked{border-color:var(--rust);}
+  .btn.danger-full{
+    width:100%; margin-top:8px; background:var(--rust); color:#fff; border:none;
+    padding:9px 6px; border-radius:var(--radius); cursor:pointer; font-size:11.5px; font-weight:700;
+  }
+  .btn.danger-full:hover{background:#8f2d22;}
+  .app-version{
+    margin-top:10px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:9.5px;
+    letter-spacing:.05em; color:var(--sidebar-ink-dim);
+  }
+
+  .file-sync{border:1px solid var(--sidebar-line); border-radius:var(--radius); padding:10px 12px; background:rgba(255,255,255,.02);}
+  .file-sync .fs-status{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--sidebar-ink); margin-bottom:8px;}
+  .fs-dot{width:7px; height:7px; border-radius:50%; flex-shrink:0;}
+  .fs-dot.none{background:var(--sidebar-ink-dim);}
+  .fs-dot.ok{background:#5FAE6E; box-shadow:0 0 0 3px rgba(95,174,110,.18);}
+  .fs-dot.error{background:var(--rust); box-shadow:0 0 0 3px rgba(178,58,46,.2);}
+  .fs-dot.pending{background:var(--amber); box-shadow:0 0 0 3px rgba(240,165,0,.2);}
+  .file-sync .fs-name{font-family:'IBM Plex Mono',monospace; color:#fff; word-break:break-all;}
+  .file-sync .fs-time{color:var(--sidebar-ink-dim); font-size:10.5px; margin-top:2px;}
+  .file-sync .fs-btns{display:flex; gap:6px;}
+  .file-sync .fs-hint{color:var(--sidebar-ink-dim); font-size:9.5px; line-height:1.4; margin-top:8px;}
+  .file-sync .unsupported{font-size:11px; color:var(--sidebar-ink-dim); line-height:1.5;}
+
+  .content{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .topbar{
+    background:var(--surface); border-bottom:1px solid var(--line);
+    padding:16px 28px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+  .topbar h2{font-size:22px; text-transform:uppercase;}
+  .topbar .sub{color:var(--ink-soft); font-size:12.5px; margin-top:2px;}
+  .period-pill{
+    display:flex; align-items:center; gap:10px;
+    background:var(--surface-2); border:1px solid var(--line); border-radius:20px;
+    padding:6px 14px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft);
+  }
+  .period-pill b{color:var(--ink); font-weight:600;}
+  .view{padding:24px 28px 60px; max-width:1180px;}
+
+  /* ---------- generic ---------- */
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .section-title{
+    display:flex; align-items:baseline; gap:10px; margin-bottom:14px;
+  }
+  .section-title h3{font-size:16px; text-transform:uppercase;}
+  .section-title .count{color:var(--ink-faint); font-family:'IBM Plex Mono',monospace; font-size:12px;}
+  .toolbar{display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px;}
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field label{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); font-weight:600;}
+  .field input, .field select, .field textarea{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:8px 10px; min-width:150px;
+  }
+  .field textarea{min-width:220px; resize:vertical; min-height:38px;}
+  .checkbox-group{display:flex; flex-wrap:wrap; gap:8px;}
+  .checkbox-pill{
+    display:flex; align-items:center; gap:6px; padding:7px 12px; border:1px solid var(--line);
+    border-radius:20px; background:var(--surface); cursor:pointer; font-size:12.5px; user-select:none;
+  }
+  .checkbox-pill:has(input:checked), .checkbox-pill.checked{border-color:var(--amber-deep); background:#FEF3DE;}
+  .checkbox-pill input{accent-color:var(--amber-deep); cursor:pointer;}
+  .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--steel);}
+  .field input[readonly]{background:var(--surface-2); color:var(--ink-soft); cursor:default;}
+  .btn{
+    background:var(--ink); color:#fff; border:none; border-radius:var(--radius);
+    padding:9px 18px; cursor:pointer; font-weight:600; font-size:13px; letter-spacing:.02em;
+  }
+  .btn:hover{background:#000;}
+  .btn.amber{background:var(--amber); color:var(--amber-ink);}
+  .btn.amber:hover{background:var(--amber-deep); color:#fff;}
+  .btn.green{background:var(--olive); color:#fff;}
+  .btn.green:hover{background:#4A6330;}
+  .btn.outline{background:transparent; color:var(--ink); border:1px solid var(--line);}
+  .btn.outline:hover{border-color:var(--ink);}
+  .btn.small{padding:5px 10px; font-size:11.5px;}
+  .btn.danger{background:transparent; color:var(--rust); border:1px solid #E7C9C6;}
+  .btn.danger:hover{background:#FBEFEE;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  thead th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-soft); font-weight:600; padding:10px 12px; border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody td{padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:var(--surface-2);}
+  .empty-row td{text-align:center; color:var(--ink-faint); padding:26px 12px; font-style:italic;}
+
+  .badge{
+    display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px;
+    font-size:11px; font-weight:600; white-space:nowrap;
+  }
+  .badge::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor;}
+  .badge.ok{background:#EAF3EA; color:var(--olive);}
+  .badge.bad{background:#FBECEA; color:var(--rust);}
+  .badge.warn{background:#FEF3DE; color:var(--amber-deep);}
+  .badge.neutral{background:#EDEEF0; color:var(--ink-soft);}
+
+  .stars{font-family:'IBM Plex Mono',monospace; color:var(--amber-deep); font-weight:600;}
+
+  /* ---------- seletor de visualizacao (cards / lista) ---------- */
+  .view-toggle{display:inline-flex; border:1px solid var(--line); border-radius:20px; overflow:hidden; flex-shrink:0;}
+  .view-toggle button{
+    padding:8px 16px; border:none; background:var(--surface); color:var(--ink-soft); cursor:pointer;
+    font-size:12px; font-weight:600; white-space:nowrap;
+  }
+  .view-toggle button + button{border-left:1px solid var(--line);}
+  .view-toggle button.active{background:var(--ink); color:#fff;}
+  .view-toggle button:not(.active):hover{background:var(--surface-2); color:var(--ink);}
+
+  /* ---------- ordenacao (nome / premiacao) ---------- */
+  .sort-toggle{display:inline-flex; border:1px solid var(--line); border-radius:20px; overflow:hidden; flex-shrink:0;}
+  .sort-btn{
+    display:flex; align-items:center; gap:6px; padding:8px 14px; border:none; background:var(--surface);
+    color:var(--ink-soft); cursor:pointer;
+  }
+  .sort-btn + .sort-btn{border-left:1px solid var(--line);}
+  .sort-btn .ic{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700; width:14px; text-align:center;
+  }
+  .sort-btn .arrow{font-size:10px; line-height:1;}
+  .sort-btn.active{background:var(--ink); color:#fff;}
+  .sort-btn:not(.active):hover{background:var(--surface-2); color:var(--ink);}
+
+  /* ---------- premio: modo lista ---------- */
+  .premio-list{display:flex; flex-direction:column; gap:10px;}
+  .premio-list-item{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
+    display:flex; align-items:center; gap:22px; padding:14px 20px 14px 16px; position:relative; overflow:hidden;
+  }
+  .premio-list-item::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:5px;
+    background:repeating-linear-gradient(135deg, var(--amber) 0 8px, var(--sidebar) 8px 16px);
+  }
+  .premio-list-item .pl-id{width:170px; flex-shrink:0; padding-left:10px;}
+  .premio-list-item .pl-id .nome{font-family:'Oswald',sans-serif; font-size:15px; text-transform:uppercase; line-height:1.2;}
+  .premio-list-item .pl-id .fn{font-size:10.5px; color:var(--ink-soft); margin:2px 0 6px;}
+  .premio-list-item .pl-gauges{flex:1; display:flex; gap:20px; min-width:0;}
+  .premio-list-item .pl-gauge{flex:1; min-width:0;}
+  .premio-list-item .pl-gauge .g-label{
+    font-size:10px; color:var(--ink-soft); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .premio-list-item .pl-gauge .g-track{height:7px; background:var(--surface-2); border:1px solid var(--line); border-radius:20px; overflow:hidden;}
+  .premio-list-item .pl-gauge .g-fill{height:100%; border-radius:20px;}
+  .premio-list-item .pl-gauge.prod .g-fill{background:var(--amber);}
+  .premio-list-item .pl-gauge.qual .g-fill{background:var(--steel);}
+  .premio-list-item .pl-gauge.assi .g-fill{background:var(--olive);}
+  .premio-list-item .pl-gauge .g-val{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; margin-top:3px;}
+  .premio-list-item .pl-gauge.inativo .g-track{background:repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--line) 6px 12px);}
+  .premio-list-item .pl-gauge.inativo .g-val{color:var(--ink-faint); font-weight:500;}
+  .premio-list-item .pl-final{width:104px; text-align:center; flex-shrink:0;}
+  .premio-list-item .pl-final .big{font-family:'Oswald',sans-serif; font-size:21px; line-height:1; white-space:nowrap;}
+  .premio-list-item .pl-final .cap{font-size:9px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;}
+  .premio-list-item .pl-money{width:250px; flex-shrink:0; display:flex; align-items:center; justify-content:flex-end; gap:12px;}
+  .premio-list-item .pl-money .field{flex-direction:row; align-items:center; gap:6px;}
+  .premio-list-item .pl-money .field label{white-space:nowrap; font-size:10px;}
+  .premio-list-item .pl-money input{width:80px; text-align:right; font-family:'IBM Plex Mono',monospace; min-width:0;}
+  .premio-list-item .pl-money .receber{text-align:right;}
+  .premio-list-item .pl-money .receber .amt{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px; white-space:nowrap;}
+  .premio-list-item .pl-money .receber .cap{font-size:9px; color:var(--ink-soft); text-transform:uppercase;}
+
+  /* ---------- premio cards ---------- */
+  .premio-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:16px;}
+  .crachá{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); position:relative; overflow:hidden;
+  }
+  .crachá .tab-stripe{height:5px; background:repeating-linear-gradient(135deg, var(--amber) 0 8px, var(--sidebar) 8px 16px);}
+  .crachá .head{padding:14px 16px 10px; display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .crachá .head .nome{font-family:'Oswald',sans-serif; font-size:18px; text-transform:uppercase;}
+  .crachá .head .fn{color:var(--ink-soft); font-size:12px; margin-top:2px;}
+  .crachá .head .turno-tag{font-family:'IBM Plex Mono',monospace; font-size:10px; background:var(--surface-2); border:1px solid var(--line); padding:3px 7px; border-radius:20px; color:var(--ink-soft); white-space:nowrap;}
+  .crachá .nota-final{padding:0 16px 12px;}
+  .crachá .nota-final .big{font-family:'Oswald',sans-serif; font-size:38px; line-height:1;}
+  .crachá .nota-final .cap{font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft);}
+  .gauges{padding:0 16px 14px; display:flex; flex-direction:column; gap:9px;}
+  .gauge-row{display:flex; align-items:center; gap:8px;}
+  .gauge-row .g-label{width:132px; font-size:11px; color:var(--ink-soft); flex-shrink:0;}
+  .gauge-row .g-track{flex:1; height:8px; background:var(--surface-2); border:1px solid var(--line); border-radius:20px; overflow:hidden;}
+  .gauge-row .g-fill{height:100%; border-radius:20px;}
+  .gauge-row.prod .g-fill{background:var(--amber);}
+  .gauge-row.qual .g-fill{background:var(--steel);}
+  .gauge-row.assi .g-fill{background:var(--olive);}
+  .gauge-row .g-val{width:42px; text-align:right; font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600;}
+  .gauge-row.inativo .g-track{background:repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--line) 6px 12px);}
+  .gauge-row.inativo .g-val{color:var(--ink-faint); font-weight:500;}
+  .g-note{color:var(--ink-faint); font-weight:400; text-transform:none; letter-spacing:0; font-size:10.5px;}
+  .crachá .details{border-top:1px solid var(--line); padding:12px 16px; background:var(--surface-2); font-size:11.5px; color:var(--ink-soft); display:grid; grid-template-columns:1fr 1fr; gap:6px 14px;}
+  .crachá .details b{color:var(--ink); font-weight:600;}
+  .crachá .money{border-top:1px solid var(--line); padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:10px;}
+  .crachá .money .field{flex-direction:row; align-items:center; gap:6px;}
+  .crachá .money .field label{white-space:nowrap;}
+  .crachá .money input{width:100px; text-align:right; font-family:'IBM Plex Mono',monospace;}
+  .valor-base-display{font-size:13px; font-weight:600; color:var(--ink);}
+  .crachá .money .receber{text-align:right;}
+  .crachá .money .receber .amt{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px;}
+  .crachá .money .receber .cap{font-size:10px; color:var(--ink-soft); text-transform:uppercase;}
+
+  .panel-actions{display:flex; justify-content:flex-end; gap:8px; margin:18px 0 4px;}
+
+  .instructions{background:var(--surface-2); border:1px dashed var(--line); border-radius:var(--radius); padding:14px 16px; font-size:12.5px; color:var(--ink-soft); margin-bottom:18px;}
+  .instructions b{color:var(--ink);}
+
+  .toast{
+    position:fixed; bottom:20px; right:20px; background:var(--ink); color:#fff; padding:11px 18px;
+    border-radius:var(--radius); font-size:13px; box-shadow:var(--shadow); z-index:50;
+    display:flex; align-items:center; gap:8px; transform:translateY(8px); opacity:0; transition:all .25s ease;
+    pointer-events:none;
+  }
+  .toast.show{transform:translateY(0); opacity:1;}
+  .toast.amber{background:var(--amber); color:var(--amber-ink);}
+
+  @media (max-width: 860px){
+    .app{flex-direction:column;}
+    .sidebar{width:100%; flex-direction:row; align-items:center; flex-wrap:wrap;}
+    .sidebar-head{padding:12px 14px; flex:1;}
+    .sidebar-head h1{font-size:14px;}
+    .sidebar nav{display:none;}
+    .sidebar-foot{display:none;}
+    .view{padding:18px 16px 50px;}
+    .topbar{padding:14px 16px;}
+    .period-pill{font-size:11px; white-space:normal;}
+    .premio-list-item{flex-wrap:wrap; align-items:flex-start; gap:12px;}
+    .premio-list-item .pl-id{width:auto; flex-basis:100%; padding-left:0;}
+    .premio-list-item .pl-gauges{flex-basis:100%; flex-wrap:wrap; gap:12px;}
+    .premio-list-item .pl-gauge{flex-basis:100%;}
+    .premio-list-item .pl-final{width:auto;}
+    .premio-list-item .pl-money{width:auto; flex-basis:100%; justify-content:space-between;}
+    .section-title[style*="space-between"]{flex-direction:column; align-items:flex-start !important; gap:10px;}
+  }
+  .nav-mobile-select{display:none;}
+  @media (max-width: 860px){
+    .nav-mobile-select{
+      display:block; width:100%; flex-basis:100%; margin:0 14px 12px; padding:10px 12px;
+      background:#2C3238; color:#fff; border:1px solid var(--sidebar-line); border-radius:var(--radius);
+      font-family:'IBM Plex Sans', sans-serif; font-size:14px; font-weight:600;
+      -webkit-appearance:none; appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F0A500' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 10px center; background-size:16px;
+    }
+    .nav-mobile-select:focus{outline:2px solid var(--amber); outline-offset:1px;}
+  }
+
+  /* ---------- impressao / exportar pdf ---------- */
+  .print-header{display:none;}
+  @media print{
+    @page{ margin: 14mm; }
+    body{background:#fff;}
+    .sidebar, .topbar, .no-print, .toast{display:none !important;}
+    .content{display:block;}
+    .view{padding:0; max-width:100%;}
+    .print-header{
+      display:block; margin-bottom:18px; padding-bottom:12px; border-bottom:2px solid var(--ink);
+    }
+    .print-title{font-family:'Oswald',sans-serif; font-size:22px; text-transform:uppercase; font-weight:600;}
+    .print-meta{font-size:11.5px; color:var(--ink-soft); margin-top:4px;}
+    .premio-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    .crachá{box-shadow:none; border:1px solid #ccc; break-inside:avoid; page-break-inside:avoid;}
+    .crachá .money input{
+      border:none; background:transparent; padding:0; -webkit-appearance:none; appearance:none;
+      font-weight:600; width:auto;
+    }
+    .crachá .money input::-webkit-outer-spin-button,
+    .crachá .money input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+    .crachá .money input[type=number]{ -moz-appearance:textfield; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="top-status" id="topFileStatus"></div>
+      <div class="brand-highlight">SGP Estoque</div>
+      <span class="tag">Estoque · Turnos 1-2-3</span>
+      <h1>SGP&nbsp;Estoque</h1>
+    </div>
+    <nav id="nav"></nav>
+    <select id="navMobile" class="nav-mobile-select"></select>
+    <div class="sidebar-foot">
+      <div class="file-sync" id="fileSyncBox"></div>
+      <div>
+        <span class="store-label">Backup manual</span>
+        <div class="backup-btns">
+          <button class="ghost-btn" id="btnExport">Exportar .json</button>
+          <button class="ghost-btn" id="btnImport">Importar .json</button>
+        </div>
+      </div>
+      <input type="file" id="fileImport" accept="application/json" style="display:none">
+
+      <div class="danger-zone">
+        <div class="slide-unlock" id="slideUnlock">
+          <div class="slide-label">Apagar tudo →</div>
+          <div class="slide-thumb" id="slideThumb">➜</div>
+        </div>
+        <button class="btn danger-full" id="btnResetAll" style="display:none;">⚠ Resetar todos os dados</button>
+        <div class="app-version">V 01.01.07</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <div>
+        <h2 id="viewTitle">Dashboard</h2>
+        <div class="sub" id="viewSub">Pesos padrão: 50% produtividade · 25% qualidade (tarefas extras e/ou inventário) · 25% assiduidade e comportamento</div>
+      </div>
+      <div class="period-pill" id="periodPill"></div>
+    </header>
+    <div class="view" id="view"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   ARMAZENAMENTO — usa window.storage (Claude) quando disponivel,
+   senao usa localStorage do proprio navegador (uso local, offline).
+========================================================= */
+const hasClaudeStorage = (typeof window.storage !== "undefined");
+
+async function storeGet(key, fallback){
+  try{
+    if(hasClaudeStorage){
+      const r = await window.storage.get(key, false);
+      return r && r.value !== undefined ? JSON.parse(r.value) : fallback;
+    } else {
+      const raw = localStorage.getItem(key);
+      return raw !== null ? JSON.parse(raw) : fallback;
+    }
+  }catch(e){ return fallback; }
+}
+async function storeSet(key, value){
+  try{
+    if(hasClaudeStorage){
+      await window.storage.set(key, JSON.stringify(value), false);
+    } else {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  }catch(e){ console.error("Falha ao salvar", key, e); }
+}
+
+/* =========================================================
+   ARQUIVO LOCAL CONECTADO (File System Access API)
+   Salva um .json na mesma pasta, direto no disco, a cada
+   alteracao — funciona no Chrome, Edge e outros navegadores
+   Chromium. Em navegadores sem suporte (Firefox, Safari), o
+   app cai de volta para o backup manual (.json exportado).
+========================================================= */
+const hasFSAccess = ("showSaveFilePicker" in window);
+let fileHandle = null;
+let fileStatus = "none"; // none | ok | error | pending
+let lastFileSave = null;
+let fileSaveTimer = null;
+
+function openHandleDB(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open("estoque_arquivo_conectado", 1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore("handles");
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, val){
+  const db = await openHandleDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction("handles","readwrite");
+    tx.objectStore("handles").put(val, key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await openHandleDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction("handles","readonly");
+    const req = tx.objectStore("handles").get(key);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbDelete(key){
+  const db = await openHandleDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction("handles","readwrite");
+    tx.objectStore("handles").delete(key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+function buildBackupObject(){
+  return {
+    equipe: state.equipe, presencas: state.presencas, inventarios: state.inventarios,
+    tarefas: state.tarefas, config: state.config, salvoEm: new Date().toISOString(),
+  };
+}
+
+async function writeStateToFile(){
+  if(!fileHandle) return;
+  try{
+    const perm = await fileHandle.queryPermission({ mode: "readwrite" });
+    if(perm !== "granted"){
+      fileStatus = "pending";
+      renderFileSyncBox();
+      return;
+    }
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(buildBackupObject(), null, 2));
+    await writable.close();
+    lastFileSave = new Date();
+    fileStatus = "ok";
+  }catch(err){
+    console.error("Falha ao salvar no arquivo conectado:", err);
+    fileStatus = "error";
+  }
+  renderFileSyncBox();
+}
+
+function scheduleFileSave(){
+  if(!fileHandle) return;
+  clearTimeout(fileSaveTimer);
+  fileSaveTimer = setTimeout(writeStateToFile, 300);
+}
+
+async function connectFile(){
+  if(!hasFSAccess){ toast("Esse navegador não permite conectar um arquivo automaticamente. Use Exportar/Importar .json.", "amber"); return; }
+
+  // IMPORTANTE: usamos showOpenFilePicker (abrir) em vez de showSaveFilePicker
+  // (salvar) para conectar. O picker de "salvar" e feito para criar/substituir
+  // arquivos, e em varios sistemas ele zera o arquivo assim que voce escolhe
+  // um existente — antes do nosso codigo sequer ler o conteudo. O picker de
+  // "abrir" e so leitura por natureza, entao nunca corre esse risco.
+  let handle;
+  try{
+    const handles = await window.showOpenFilePicker({
+      types: [{ description: "Backup de dados (JSON)", accept: { "application/json": [".json"] } }],
+      excludeAcceptAllOption: false,
+      multiple: false,
+    });
+    handle = handles[0];
+  }catch(err){
+    if(err && err.name === "AbortError") return; // usuario cancelou o dialogo
+    console.error(err);
+    toast("Não foi possível abrir o arquivo.");
+    return;
+  }
+
+  // O picker de abrir so concede leitura por padrao — pedimos permissao de
+  // escrita explicitamente, para poder salvar automaticamente depois.
+  try{
+    const permissao = await handle.requestPermission({ mode: "readwrite" });
+    if(permissao !== "granted"){
+      toast("Permissão de escrita negada — não é possível salvar automaticamente nesse arquivo.");
+      return;
+    }
+  }catch(err){
+    console.error(err);
+    toast("Não foi possível obter permissão de escrita nesse arquivo.");
+    return;
+  }
+
+  // So agora lemos o conteudo — o arquivo ainda esta intacto neste ponto,
+  // pois nenhuma escrita foi feita ate aqui.
+  let textoAtual = "";
+  try{
+    const file = await handle.getFile();
+    textoAtual = await file.text();
+  }catch(err){
+    console.error(err);
+    toast("Não foi possível ler esse arquivo. A conexão foi cancelada para não arriscar sobrescrever dados.");
+    return;
+  }
+
+  let importedExisting = false;
+  if(textoAtual && textoAtual.trim().length > 0){
+    let data;
+    try{
+      data = JSON.parse(textoAtual);
+    }catch(err){
+      alert("Esse arquivo não pôde ser lido como um backup válido (JSON inválido). A conexão foi cancelada para não arriscar sobrescrever os dados que já estão nesse arquivo. Verifique o arquivo e tente de novo.");
+      return;
+    }
+    if(confirm("Esse arquivo já tem dados salvos. Clique OK para IMPORTAR esses dados agora (substitui o que está neste navegador), ou Cancelar para manter os dados atuais e sobrescrever o arquivo.")){
+      state.equipe = data.equipe || [];
+      state.presencas = data.presencas || [];
+      state.inventarios = data.inventarios || [];
+      state.tarefas = data.tarefas || [];
+      state.config = data.config || defaultPeriodo();
+      await Promise.all([saveEquipe(), savePresencas(), saveInventarios(), saveTarefas(), saveConfig()]);
+      importedExisting = true;
+    }
+  }
+
+  fileHandle = handle;
+  try{
+    await idbSet("fileHandle", handle);
+  }catch(e){
+    // Alguns navegadores/modos (ex: aba anonima) podem bloquear o IndexedDB.
+    // O salvamento automatico continua funcionando nesta sessao; so nao
+    // sera lembrado depois de fechar e reabrir a pagina.
+    console.warn("Não foi possível lembrar este arquivo entre sessões:", e);
+  }
+  await writeStateToFile();
+  toast(importedExisting ? "Arquivo conectado e dados importados." : "Arquivo conectado — salvando automaticamente.", "amber");
+  if(importedExisting) renderAll();
+}
+
+async function reactivateFile(){
+  if(!fileHandle) return;
+  try{
+    const perm = await fileHandle.requestPermission({ mode: "readwrite" });
+    if(perm === "granted"){ await writeStateToFile(); toast("Salvamento automático reativado.", "amber"); }
+    else { fileStatus = "error"; renderFileSyncBox(); }
+  }catch(err){ console.error(err); }
+}
+
+async function disconnectFile(){
+  fileHandle = null;
+  fileStatus = "none";
+  await idbDelete("fileHandle");
+  renderFileSyncBox();
+  toast("Arquivo desconectado. Os dados continuam salvos neste navegador.");
+}
+
+function fmtTime(d){
+  if(!d) return "";
+  return d.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+}
+
+function renderFileSyncBox(){
+  const box = document.getElementById("fileSyncBox");
+  const top = document.getElementById("topFileStatus");
+
+  if(!hasFSAccess){
+    if(box) box.innerHTML = `
+      <div class="unsupported">Esse navegador não salva automaticamente em arquivo. Use <b>Exportar .json</b> de vez em quando para não perder dados.</div>
+    `;
+    if(top) top.innerHTML = "";
+    return;
+  }
+
+  if(!fileHandle){
+    if(box) box.innerHTML = `
+      <div class="fs-status"><span class="fs-dot none"></span>Nenhum arquivo conectado</div>
+      <button class="ghost-btn" id="btnConnectFile" style="width:100%">Conectar arquivo de dados</button>
+      <div class="fs-hint">O arquivo precisa já existir. Se ainda não tem um, use "Exportar .json" para criar, depois conecte nele.</div>
+    `;
+    if(top) top.innerHTML = `<span class="fs-dot none"></span>Sem arquivo conectado`;
+  } else if(fileStatus === "pending"){
+    if(box) box.innerHTML = `
+      <div class="fs-status"><span class="fs-dot pending"></span>Permissão pendente</div>
+      <button class="ghost-btn" id="btnReactivateFile" style="width:100%">Reativar salvamento</button>
+    `;
+    if(top) top.innerHTML = `<span class="fs-dot pending"></span>Permissão pendente`;
+  } else {
+    const dotClass = fileStatus === "error" ? "error" : "ok";
+    const label = fileStatus === "error" ? "Erro ao salvar — tentando de novo" : "Salvando automaticamente";
+    if(box) box.innerHTML = `
+      <div class="fs-status"><span class="fs-dot ${dotClass}"></span>${label}</div>
+      <div class="fs-name">${escapeHtml(fileHandle.name || "base de dados.json")}</div>
+      <div class="fs-time">${lastFileSave ? "Último salvamento: " + fmtTime(lastFileSave) : ""}</div>
+      <div class="fs-btns" style="margin-top:8px">
+        <button class="ghost-btn" id="btnDisconnectFile">Desconectar</button>
+      </div>
+    `;
+    if(top) top.innerHTML = `<span class="fs-dot ${dotClass}"></span>${label}`;
+  }
+
+  if(top){
+    top.classList.toggle("clickable", !fileHandle);
+    top.onclick = fileHandle ? null : connectFile;
+  }
+
+  const btnConnect = document.getElementById("btnConnectFile");
+  if(btnConnect) btnConnect.addEventListener("click", connectFile);
+  const btnReactivate = document.getElementById("btnReactivateFile");
+  if(btnReactivate) btnReactivate.addEventListener("click", reactivateFile);
+  const btnDisconnect = document.getElementById("btnDisconnectFile");
+  if(btnDisconnect) btnDisconnect.addEventListener("click", disconnectFile);
+}
+
+async function tryReconnectOnLoad(){
+  if(!hasFSAccess) { renderFileSyncBox(); return; }
+  try{
+    const handle = await idbGet("fileHandle");
+    if(!handle){ renderFileSyncBox(); return; }
+    fileHandle = handle;
+    const perm = await handle.queryPermission({ mode: "readwrite" });
+    if(perm === "granted"){ fileStatus = "ok"; }
+    else { fileStatus = "pending"; }
+  }catch(err){ console.error(err); }
+  renderFileSyncBox();
+}
+
+/* =========================================================
+   ESTADO
+========================================================= */
+const STATUS_PRESENCA = ["Presente","Falta","Falta Justificada","Atraso","Férias"];
+const STATUS_INV = ["Concluído","Pendente","Não Realizado"];
+const STATUS_TAREFA = ["Concluída","Pendente","Cancelada"];
+const TURNOS = ["1º Turno","2º Turno","3º Turno"];
+
+let state = {
+  equipe: [],
+  presencas: [],
+  inventarios: [],
+  tarefas: [],
+  config: { inicio:"", fim:"", diasUteis:22 },
+};
+let currentView = "premio";
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(iso){
+  if(!iso) return "—";
+  const [y,m,d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+function nextId(list){ return list.reduce((mx,r)=>Math.max(mx, r.id||0), 0) + 1; }
+function pct(frac){ return (frac*100).toFixed(1) + "%"; }
+function money(v){ return "R$ " + (v||0).toLocaleString("pt-BR",{minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+function diasEntre(inicioISO, fimISO){
+  if(!inicioISO || !fimISO) return 0;
+  const d1 = new Date(inicioISO + "T00:00:00");
+  const d2 = new Date(fimISO + "T00:00:00");
+  const diff = Math.round((d2 - d1) / 86400000);
+  return diff >= 0 ? diff + 1 : 0;
+}
+
+function ehFimDeSemana(iso){
+  const dia = new Date(iso + "T00:00:00").getDay(); // 0 = domingo, 6 = sabado
+  return dia === 0 || dia === 6;
+}
+
+// Conta os "dias uteis" do periodo para um colaborador especifico: segunda a
+// sexta sempre contam; sabado e domingo sao dias de descanso e SO contam se
+// a pessoa tiver algum lancamento de presenca naquele dia especifico (ou
+// seja, foi chamada a trabalhar excepcionalmente naquele fim de semana).
+function contarDiasBasePeriodo(periodoInicio, periodoFim, presencasDoColaborador){
+  if(!periodoInicio || !periodoFim) return 0;
+  const diasComRegistroNoFds = new Set();
+  for(const p of presencasDoColaborador){
+    if(ehFimDeSemana(p.data)) diasComRegistroNoFds.add(p.data);
+  }
+  let count = 0;
+  const cursor = new Date(periodoInicio + "T00:00:00");
+  const fimObj = new Date(periodoFim + "T00:00:00");
+  while(cursor <= fimObj){
+    const iso = cursor.toISOString().slice(0,10);
+    if(!ehFimDeSemana(iso) || diasComRegistroNoFds.has(iso)) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
+function defaultPeriodo(){
+  const now = new Date();
+  // periodo padrao: dia 19 do mes anterior ao dia 18 do mes atual (ajusta se hoje < dia 19)
+  let fim = new Date(now.getFullYear(), now.getMonth(), 18);
+  if(now.getDate() < 19) fim = new Date(now.getFullYear(), now.getMonth()-1, 18);
+  const inicio = new Date(fim.getFullYear(), fim.getMonth()-1, 19);
+  const iso = (d)=> d.toISOString().slice(0,10);
+  const inicioISO = iso(inicio), fimISO = iso(fim);
+  return { inicio: inicioISO, fim: fimISO, diasUteis: diasEntre(inicioISO, fimISO) };
+}
+
+/* =========================================================
+   CALCULO DO PREMIO (mesma logica da planilha / software C++)
+========================================================= */
+function calcPremio(colab, periodoInicio, periodoFim, diasUteis){
+  const nome = colab.nome;
+  const inRange = (d) => d && d >= periodoInicio && d <= periodoFim;
+
+  // Inventario e uma forca-tarefa em grupo: quem participou do dia recebe o
+  // mesmo credito de "concluido ou nao", sem pesar por quantidade individual.
+  let invAtribuidas=0, invConcluidas=0;
+  for(const inv of state.inventarios){
+    if(!inRange(inv.data)) continue;
+    const participantes = inv.participantes || [];
+    if(!participantes.includes(nome)) continue;
+    invAtribuidas++;
+    if(inv.status === "Concluído") invConcluidas++;
+  }
+
+  let tarefasAtribuidas=0, tarefasConcluidas=0, somaNota=0, qtdNota=0;
+  for(const t of state.tarefas){
+    if(!inRange(t.data)) continue;
+    if(t.colaborador !== nome) continue;
+    tarefasAtribuidas++;
+    if(t.status === "Concluída"){
+      tarefasConcluidas++;
+      if(Number(t.notaQualidade)>0){ somaNota += Number(t.notaQualidade); qtdNota++; }
+    }
+  }
+  const notaQualidadeMedia = qtdNota>0 ? somaNota/qtdNota : 0;
+
+  const denomProd = invAtribuidas + tarefasAtribuidas;
+  const produtividade = denomProd>0 ? (invConcluidas+tarefasConcluidas)/denomProd : 0;
+
+  const temTarefas = tarefasAtribuidas>0;
+  const temInv = invAtribuidas>0;
+  // Qualidade combina duas fontes, quando existem: a nota das tarefas extras
+  // e o % de inventarios concluidos — ajudar a bater a meta diaria das 30
+  // referencias tambem conta como execucao com qualidade, nao so como
+  // produtividade.
+  const qualidadeInventario = temInv ? invConcluidas/invAtribuidas : 0;
+  let numQual = 0, cntQual = 0;
+  if(temTarefas){ numQual += notaQualidadeMedia/5; cntQual++; }
+  if(temInv){ numQual += qualidadeInventario; cntQual++; }
+  const qualidade = cntQual>0 ? numQual/cntQual : 0;
+
+  let diasPresentes=0, diasFerias=0, somaComp=0, qtdComp=0;
+  const presencasDoColaborador = [];
+  for(const p of state.presencas){
+    if(!inRange(p.data)) continue;
+    if(p.colaborador !== nome) continue;
+    presencasDoColaborador.push(p);
+    if(p.status === "Presente") diasPresentes++;
+    if(p.status === "Férias") diasFerias++;
+    if(Number(p.notaComportamento)>0){ somaComp += Number(p.notaComportamento); qtdComp++; }
+  }
+  const notaComportamentoMedia = qtdComp>0 ? somaComp/qtdComp : 0;
+  // Sabado e domingo sao dias de descanso por padrao e nao contam contra a
+  // assiduidade — so entram na conta se a pessoa tiver sido chamada pra
+  // trabalhar naquele dia especifico (ou seja, existe um lancamento dela
+  // naquele fim de semana). Ferias tambem sao neutras: saem do denominador,
+  // entao nao derrubam a nota por um dia em que a pessoa nem deveria
+  // trabalhar.
+  const diasBase = contarDiasBasePeriodo(periodoInicio, periodoFim, presencasDoColaborador);
+  const diasUteisEfetivos = Math.max(0, diasBase - diasFerias);
+  const assiduidade = diasUteisEfetivos>0 ? diasPresentes/diasUteisEfetivos : 0;
+  const assidComportamento = (assiduidade + notaComportamentoMedia/5) / 2;
+
+  // ---- Pesos dinamicos ----
+  // Tarefas extras sao ocasionais: quem nao recebeu nenhuma no periodo nao
+  // pode ser penalizado por isso. Se a Qualidade nao for aplicavel (sem
+  // tarefas), seu peso (25%) e redistribuido proporcionalmente entre os
+  // demais criterios que sim se aplicam ao colaborador no periodo. O mesmo
+  // vale para Assiduidade se o colaborador esteve de ferias o periodo inteiro.
+  const pesoBase = { produtividade: 0.5, qualidade: 0.25, assiduidade: 0.25 };
+  const aplicavel = {
+    produtividade: (invAtribuidas + tarefasAtribuidas) > 0,
+    qualidade: temTarefas || temInv,
+    assiduidade: diasUteisEfetivos > 0,
+  };
+  const somaPesosAtivos = Object.keys(pesoBase).reduce((s,k)=> s + (aplicavel[k] ? pesoBase[k] : 0), 0);
+  const pesos = {
+    produtividade: somaPesosAtivos>0 && aplicavel.produtividade ? pesoBase.produtividade/somaPesosAtivos : 0,
+    qualidade: somaPesosAtivos>0 && aplicavel.qualidade ? pesoBase.qualidade/somaPesosAtivos : 0,
+    assiduidade: somaPesosAtivos>0 && aplicavel.assiduidade ? pesoBase.assiduidade/somaPesosAtivos : 0,
+  };
+
+  const notaFinal = pesos.produtividade*produtividade + pesos.qualidade*qualidade + pesos.assiduidade*assidComportamento;
+  const valorReceber = (colab.valorBase||0) * notaFinal;
+
+  return { nome, funcao:colab.funcao, turno:colab.turno,
+    invAtribuidas, invConcluidas,
+    tarefasAtribuidas, tarefasConcluidas, notaQualidadeMedia, qualidadeInventario,
+    produtividade, qualidade,
+    diasPresentes, diasFerias, diasUteis, diasUteisEfetivos, notaComportamentoMedia,
+    assiduidade, assidComportamento,
+    aplicavel, pesos,
+    notaFinal, valorBase: colab.valorBase||0, valorReceber };
+}
+
+/* =========================================================
+   TOAST
+========================================================= */
+let toastTimer=null;
+function toast(msg, kind){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "toast show" + (kind==="amber" ? " amber" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove("show"), 2400);
+}
+
+/* =========================================================
+   PERSISTENCIA — salvar cada colecao
+========================================================= */
+async function saveEquipe(){ await storeSet("equipe", state.equipe); scheduleFileSave(); }
+async function savePresencas(){ await storeSet("presencas", state.presencas); scheduleFileSave(); }
+async function saveInventarios(){ await storeSet("inventarios", state.inventarios); scheduleFileSave(); }
+async function saveTarefas(){ await storeSet("tarefas", state.tarefas); scheduleFileSave(); }
+async function saveConfig(){ await storeSet("config", state.config); scheduleFileSave(); }
+
+/* =========================================================
+   NAVEGACAO
+========================================================= */
+const NAV = [
+  {id:"premio", label:"Dashboard", icon:"$", title:"Dashboard", sub:"Pesos padrão: 50% produtividade · 25% qualidade (tarefas extras e/ou inventário) · 25% assiduidade e comportamento"},
+  {id:"atividades", label:"Atividades", icon:"✓", title:"Atividades", sub:"Todas as tarefas executadas pela equipe — inventário diário e tarefas extras juntos"},
+  {id:"equipe", label:"Equipe", icon:"E", title:"Equipe", sub:"Cadastro de colaboradores, função, turno e valor base do prêmio"},
+  {id:"presencas", label:"Presenças", icon:"P", title:"Presenças", sub:"Lançamento diário de presença e comportamento"},
+  {id:"inventario", label:"Inventário Diário", icon:"I", title:"Inventário Diário", sub:"Tarefa fixa — 30 referências contadas todos os dias"},
+  {id:"tarefas", label:"Tarefas Extras", icon:"T", title:"Tarefas Extras", sub:"Demandas do dia a dia, fora do inventário fixo"},
+];
+
+function renderNav(){
+  const nav = document.getElementById("nav");
+  nav.innerHTML = NAV.map(item => `
+    <button class="nav-item ${item.id===currentView?'active':''}" data-view="${item.id}">
+      <span class="ic">${item.icon}</span>${item.label}
+    </button>
+  `).join("");
+  nav.querySelectorAll(".nav-item").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ currentView = btn.dataset.view; renderAll(); });
+  });
+
+  const navMobile = document.getElementById("navMobile");
+  if(navMobile){
+    navMobile.innerHTML = NAV.map(item =>
+      `<option value="${item.id}" ${item.id===currentView?'selected':''}>${item.label}</option>`
+    ).join("");
+    navMobile.onchange = ()=>{ currentView = navMobile.value; renderAll(); };
+  }
+}
+
+function pillHtml(inicio, fim, dias){
+  return `📅 <b>${fmtDate(inicio)}</b> até <b>${fmtDate(fim)}</b> &nbsp;·&nbsp; <b>${dias}</b>&nbsp;dias&nbsp;no&nbsp;período`;
+}
+
+function renderTopbar(){
+  const item = NAV.find(n=>n.id===currentView);
+  document.getElementById("viewTitle").textContent = item.title;
+  document.getElementById("viewSub").textContent = item.sub;
+  const pill = document.getElementById("periodPill");
+  pill.innerHTML = pillHtml(state.config.inicio, state.config.fim, state.config.diasUteis);
+}
+
+function renderAll(){
+  renderNav();
+  renderTopbar();
+  const view = document.getElementById("view");
+  if(currentView==="premio") view.innerHTML = viewPremio();
+  else if(currentView==="atividades") view.innerHTML = viewAtividades();
+  else if(currentView==="equipe") view.innerHTML = viewEquipe();
+  else if(currentView==="presencas") view.innerHTML = viewPresencas();
+  else if(currentView==="inventario") view.innerHTML = viewInventario();
+  else if(currentView==="tarefas") view.innerHTML = viewTarefas();
+  bindViewEvents();
+}
+
+/* =========================================================
+   VIEW: EQUIPE
+========================================================= */
+function viewEquipe(){
+  const funcoesUnicas = [...new Set(state.equipe.map(c=>c.funcao).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const turnosUnicos = [...new Set(state.equipe.map(c=>c.turno).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+
+  const termoNome = filtroEquipe.nome.trim().toLowerCase();
+  const itensFiltrados = state.equipe
+    .map((c,i)=>({ c, i }))
+    .filter(({c})=>{
+      if(termoNome && !c.nome.toLowerCase().includes(termoNome)) return false;
+      if(filtroEquipe.funcao && c.funcao !== filtroEquipe.funcao) return false;
+      if(filtroEquipe.turno && c.turno !== filtroEquipe.turno) return false;
+      return true;
+    });
+  const filtroAtivo = termoNome || filtroEquipe.funcao || filtroEquipe.turno;
+
+  const rows = itensFiltrados.map(({c,i})=>`
+    <tr data-idx="${i}">
+      <td><input class="mono" data-field="nome" value="${escapeHtml(c.nome)}" style="width:110px"></td>
+      <td><input data-field="funcao" value="${escapeHtml(c.funcao)}" style="width:200px"></td>
+      <td>
+        <select data-field="turno">
+          ${TURNOS.map(t=>`<option ${t===c.turno?'selected':''}>${t}</option>`).join("")}
+        </select>
+      </td>
+      <td><input class="mono" data-field="valorBase" type="number" min="0" step="0.01" value="${c.valorBase||0}" style="width:110px"></td>
+      <td><button class="btn danger small" data-remove-equipe="${i}">Remover</button></td>
+    </tr>
+  `).join("") || `<tr class="empty-row"><td colspan="5">${filtroAtivo ? "Nenhum colaborador encontrado para esse filtro." : "Nenhum colaborador cadastrado ainda."}</td></tr>`;
+
+  return `
+    <div class="instructions"><b>Como funciona:</b> edite direto nos campos da tabela (o app salva automaticamente ao sair do campo). O valor base do prêmio é multiplicado pela nota final calculada na aba Dashboard.</div>
+    <div class="card" style="padding:16px 18px; margin-bottom:18px;">
+      <div class="section-title"><h3>Consultar / filtrar</h3></div>
+      <div class="toolbar">
+        <div class="field"><label>Nome</label><input type="text" id="filtroEquipeNome" placeholder="buscar por nome" value="${escapeHtml(filtroEquipe.nome)}"></div>
+        <div class="field"><label>Função</label>
+          <select id="filtroEquipeFuncao">
+            <option value="">Todas</option>
+            ${funcoesUnicas.map(f=>`<option value="${escapeHtml(f)}" ${filtroEquipe.funcao===f?'selected':''}>${escapeHtml(f)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>Turno</label>
+          <select id="filtroEquipeTurno">
+            <option value="">Todos</option>
+            ${turnosUnicos.map(t=>`<option value="${escapeHtml(t)}" ${filtroEquipe.turno===t?'selected':''}>${escapeHtml(t)}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn outline" type="button" id="btnLimparFiltroEquipe">Limpar filtro</button>
+      </div>
+    </div>
+    <div class="section-title"><h3>Equipe</h3><span class="count">${itensFiltrados.length}${filtroAtivo ? ` de ${state.equipe.length}` : ""} colaborador(es)</span></div>
+    <div class="card" style="overflow:auto">
+      <table>
+        <thead><tr><th>Nome</th><th>Função</th><th>Turno</th><th>Valor base do prêmio</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="panel-actions">
+      <button class="btn amber" id="btnAddColab">+ Adicionar colaborador</button>
+    </div>
+  `;
+}
+
+/* =========================================================
+   VIEW: PRESENCAS
+========================================================= */
+function statusBadge(status){
+  const map = {
+    "Presente":"ok", "Concluído":"ok", "Concluída":"ok",
+    "Falta":"bad", "Não Realizado":"bad", "Cancelada":"bad",
+    "Falta Justificada":"warn", "Atraso":"warn", "Pendente":"warn",
+    "Férias":"neutral",
+  };
+  return `<span class="badge ${map[status]||'neutral'}">${status}</span>`;
+}
+
+function colabOptions(selected){
+  return state.equipe.map(c=>`<option ${c.nome===selected?'selected':''}>${escapeHtml(c.nome)}</option>`).join("");
+}
+
+let filtroEquipe = { nome: "", funcao: "", turno: "" };
+let filtroInventario = { inicio: "", fim: "", refMin: "", refMax: "", status: "" };
+let filtroTarefas = { inicio: "", fim: "", colaborador: "", status: "", qualidade: "" };
+let filtroPresencas = { colaborador: "", inicio: "", fim: "" };
+let filtroAtividades = { inicio: "", fim: "", colaborador: "", tipo: "" };
+let filtroAtividadesInicializado = false;
+let modoExibicaoPremio = "cards"; // "cards" | "lista"
+let ordenacaoPremio = { campo: "nome", direcao: "asc" }; // campo: "nome" | "notaFinal"
+
+function ordenarResultados(resultados){
+  const dir = ordenacaoPremio.direcao === "asc" ? 1 : -1;
+  resultados.sort((a,b)=>{
+    const cmp = ordenacaoPremio.campo === "nome"
+      ? a.nome.localeCompare(b.nome, "pt-BR")
+      : a.notaFinal - b.notaFinal;
+    return cmp * dir;
+  });
+  return resultados;
+}
+
+function viewPresencas(){
+  const filtrado = state.presencas.filter(r=>{
+    if(filtroPresencas.colaborador && r.colaborador !== filtroPresencas.colaborador) return false;
+    if(filtroPresencas.inicio && r.data < filtroPresencas.inicio) return false;
+    if(filtroPresencas.fim && r.data > filtroPresencas.fim) return false;
+    return true;
+  });
+  const sorted = [...filtrado].sort((a,b)=> b.data.localeCompare(a.data));
+  const filtroAtivo = filtroPresencas.colaborador || filtroPresencas.inicio || filtroPresencas.fim;
+  const rows = sorted.map(r=>`
+    <tr>
+      <td class="mono">${fmtDate(r.data)}</td>
+      <td>${escapeHtml(r.colaborador)}</td>
+      <td>${escapeHtml(r.turno||"—")}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="stars">${r.notaComportamento ? "★".repeat(r.notaComportamento)+"☆".repeat(5-r.notaComportamento) : "—"}</td>
+      <td>${escapeHtml(r.obs||"")}</td>
+      <td><button class="btn danger small" data-remove-presenca="${r.id}">Excluir</button></td>
+    </tr>
+  `).join("") || `<tr class="empty-row"><td colspan="7">${filtroAtivo ? "Nenhuma presença encontrada para esse filtro." : "Nenhuma presença lançada ainda."}</td></tr>`;
+
+  return `
+    <div class="instructions"><b>Sobre férias:</b> o status "Férias" é neutro para o cálculo do prêmio — não conta como falta nem como presença. Os dias marcados como férias saem da conta de assiduidade, então não derrubam a nota do colaborador por um período em que ele nem deveria estar trabalhando.</div>
+    <div class="card" style="padding:18px 18px 4px; margin-bottom:22px;">
+      <div class="section-title"><h3>Novo lançamento</h3></div>
+      <form id="formPresenca" class="toolbar">
+        <div class="field"><label>Data</label><input type="date" name="data" value="${todayISO()}" required></div>
+        <div class="field"><label>Colaborador</label><select name="colaborador" required>${colabOptions()}</select></div>
+        <div class="field"><label>Status</label>
+          <select name="status" required>${STATUS_PRESENCA.map(s=>`<option>${s}</option>`).join("")}</select>
+        </div>
+        <div class="field"><label>Comportamento</label>
+          <select name="notaComportamento"><option value="0">Não informar</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ${'★'.repeat(n)}</option>`).join("")}</select>
+        </div>
+        <div class="field" style="flex:1"><label>Observações</label><input name="obs" placeholder="opcional"></div>
+        <button class="btn amber" type="submit">Registrar</button>
+      </form>
+    </div>
+    <div class="card" style="padding:16px 18px; margin-bottom:18px;">
+      <div class="section-title"><h3>Consultar / filtrar</h3></div>
+      <div class="toolbar">
+        <div class="field"><label>Colaborador</label>
+          <select id="filtroColaborador">
+            <option value="">Todos</option>
+            ${state.equipe.map(c=>`<option value="${escapeHtml(c.nome)}" ${filtroPresencas.colaborador===c.nome?'selected':''}>${escapeHtml(c.nome)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>De</label><input type="date" id="filtroInicio" value="${filtroPresencas.inicio}"></div>
+        <div class="field"><label>Até</label><input type="date" id="filtroFim" value="${filtroPresencas.fim}"></div>
+        <button class="btn outline" type="button" id="btnLimparFiltro">Limpar filtro</button>
+      </div>
+    </div>
+    <div class="section-title"><h3>Lançamentos</h3><span class="count">${filtrado.length}${filtroAtivo ? ` de ${state.presencas.length}` : ""} registro(s)</span></div>
+    <div class="card" style="overflow:auto">
+      <table>
+        <thead><tr><th>Data</th><th>Colaborador</th><th>Turno</th><th>Status</th><th>Comportamento</th><th>Obs.</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* =========================================================
+   VIEW: INVENTARIO
+========================================================= */
+function viewInventario(){
+  const filtrado = state.inventarios.filter(r=>{
+    if(filtroInventario.inicio && r.data < filtroInventario.inicio) return false;
+    if(filtroInventario.fim && r.data > filtroInventario.fim) return false;
+    if(filtroInventario.refMin !== "" && r.refContadas < Number(filtroInventario.refMin)) return false;
+    if(filtroInventario.refMax !== "" && r.refContadas > Number(filtroInventario.refMax)) return false;
+    if(filtroInventario.status && r.status !== filtroInventario.status) return false;
+    return true;
+  });
+  const sorted = [...filtrado].sort((a,b)=> b.data.localeCompare(a.data));
+  const filtroAtivo = filtroInventario.inicio || filtroInventario.fim || filtroInventario.refMin !== "" || filtroInventario.refMax !== "" || filtroInventario.status;
+  const rows = sorted.map(r=>`
+    <tr>
+      <td class="mono">${fmtDate(r.data)}</td>
+      <td class="mono">${r.refContadas}/${r.refPlanejadas}</td>
+      <td>${(r.participantes||[]).map(p=>`<span class="badge neutral">${escapeHtml(p)}</span>`).join(" ") || "—"}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>${escapeHtml(r.obs||"")}</td>
+      <td><button class="btn danger small" data-remove-inventario="${r.id}">Excluir</button></td>
+    </tr>
+  `).join("") || `<tr class="empty-row"><td colspan="6">${filtroAtivo ? "Nenhum inventário encontrado para esse filtro." : "Nenhum inventário lançado ainda."}</td></tr>`;
+
+  const checkboxes = state.equipe.map(c => `
+    <label class="checkbox-pill">
+      <input type="checkbox" name="participantes" value="${escapeHtml(c.nome)}">
+      <span>${escapeHtml(c.nome)}</span>
+    </label>
+  `).join("");
+
+  return `
+    <div class="instructions"><b>Como funciona:</b> todos os dias são contadas 30 referências, como força-tarefa em grupo. Marque quem participou desse inventário no dia — a contagem conta como concluída (ou não) igualmente para todos os participantes, sem depender de quantas referências cada um contou individualmente.</div>
+    <div class="card" style="padding:18px 18px 4px; margin-bottom:22px;">
+      <div class="section-title"><h3>Novo lançamento</h3></div>
+      <form id="formInventario" class="toolbar">
+        <div class="field"><label>Data</label><input type="date" name="data" value="${todayISO()}" required></div>
+        <div class="field"><label>Ref. contadas</label><input type="number" name="refContadas" value="30" min="0" style="width:90px" required></div>
+        <div class="field"><label>Status</label><select name="status" required>${STATUS_INV.map(s=>`<option>${s}</option>`).join("")}</select></div>
+        <div class="field" style="flex:1"><label>Observações</label><input name="obs" placeholder="opcional"></div>
+        <div class="field" style="flex-basis:100%"><label>Participantes</label><div class="checkbox-group">${checkboxes}</div></div>
+        <button class="btn amber" type="submit">Registrar</button>
+      </form>
+    </div>
+    <div class="card" style="padding:16px 18px; margin-bottom:18px;">
+      <div class="section-title"><h3>Consultar / filtrar</h3></div>
+      <div class="toolbar">
+        <div class="field"><label>De</label><input type="date" id="filtroInvInicio" value="${filtroInventario.inicio}"></div>
+        <div class="field"><label>Até</label><input type="date" id="filtroInvFim" value="${filtroInventario.fim}"></div>
+        <div class="field"><label>Refs. de</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="filtroInvRefMin" placeholder="mín." style="width:80px" value="${filtroInventario.refMin}"></div>
+        <div class="field"><label>Refs. até</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="filtroInvRefMax" placeholder="máx." style="width:80px" value="${filtroInventario.refMax}"></div>
+        <div class="field"><label>Status</label>
+          <select id="filtroInvStatus">
+            <option value="">Todos</option>
+            ${STATUS_INV.map(s=>`<option value="${s}" ${filtroInventario.status===s?'selected':''}>${s}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn outline" type="button" id="btnLimparFiltroInv">Limpar filtro</button>
+      </div>
+    </div>
+    <div class="section-title"><h3>Lançamentos</h3><span class="count">${filtrado.length}${filtroAtivo ? ` de ${state.inventarios.length}` : ""} registro(s)</span></div>
+    <div class="card" style="overflow:auto">
+      <table>
+        <thead><tr><th>Data</th><th>Refs.</th><th>Participantes</th><th>Status</th><th>Obs.</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* =========================================================
+   VIEW: TAREFAS EXTRAS
+========================================================= */
+function viewTarefas(){
+  const filtrado = state.tarefas.filter(r=>{
+    if(filtroTarefas.inicio && r.data < filtroTarefas.inicio) return false;
+    if(filtroTarefas.fim && r.data > filtroTarefas.fim) return false;
+    if(filtroTarefas.colaborador && r.colaborador !== filtroTarefas.colaborador) return false;
+    if(filtroTarefas.status && r.status !== filtroTarefas.status) return false;
+    if(filtroTarefas.qualidade && Number(r.notaQualidade) !== Number(filtroTarefas.qualidade)) return false;
+    return true;
+  });
+  const sorted = [...filtrado].sort((a,b)=> b.data.localeCompare(a.data));
+  const filtroAtivo = filtroTarefas.inicio || filtroTarefas.fim || filtroTarefas.colaborador || filtroTarefas.status || filtroTarefas.qualidade;
+  const rows = sorted.map(r=>`
+    <tr>
+      <td class="mono">${fmtDate(r.data)}</td>
+      <td>${escapeHtml(r.colaborador)}</td>
+      <td>${escapeHtml(r.descricao)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="stars">${r.notaQualidade ? "★".repeat(r.notaQualidade)+"☆".repeat(5-r.notaQualidade) : "—"}</td>
+      <td>${escapeHtml(r.obs||"")}</td>
+      <td><button class="btn danger small" data-remove-tarefa="${r.id}">Excluir</button></td>
+    </tr>
+  `).join("") || `<tr class="empty-row"><td colspan="7">${filtroAtivo ? "Nenhuma tarefa encontrada para esse filtro." : "Nenhuma tarefa extra lançada ainda."}</td></tr>`;
+
+  return `
+    <div class="card" style="padding:18px 18px 4px; margin-bottom:22px;">
+      <div class="section-title"><h3>Novo lançamento</h3></div>
+      <form id="formTarefa" class="toolbar">
+        <div class="field"><label>Data</label><input type="date" name="data" value="${todayISO()}" required></div>
+        <div class="field"><label>Colaborador</label><select name="colaborador" required>${colabOptions()}</select></div>
+        <div class="field" style="flex:1.4"><label>Descrição da tarefa</label><input name="descricao" placeholder="ex: reorganização do corredor 4" required></div>
+        <div class="field"><label>Status</label><select name="status" required>${STATUS_TAREFA.map(s=>`<option>${s}</option>`).join("")}</select></div>
+        <div class="field"><label>Qualidade</label>
+          <select name="notaQualidade"><option value="0">Não informar</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ${'★'.repeat(n)}</option>`).join("")}</select>
+        </div>
+        <div class="field" style="flex:1"><label>Observações</label><input name="obs" placeholder="opcional"></div>
+        <button class="btn amber" type="submit">Registrar</button>
+      </form>
+    </div>
+    <div class="card" style="padding:16px 18px; margin-bottom:18px;">
+      <div class="section-title"><h3>Consultar / filtrar</h3></div>
+      <div class="toolbar">
+        <div class="field"><label>De</label><input type="date" id="filtroTarefaInicio" value="${filtroTarefas.inicio}"></div>
+        <div class="field"><label>Até</label><input type="date" id="filtroTarefaFim" value="${filtroTarefas.fim}"></div>
+        <div class="field"><label>Colaborador</label>
+          <select id="filtroTarefaColaborador">
+            <option value="">Todos</option>
+            ${state.equipe.map(c=>`<option value="${escapeHtml(c.nome)}" ${filtroTarefas.colaborador===c.nome?'selected':''}>${escapeHtml(c.nome)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>Status</label>
+          <select id="filtroTarefaStatus">
+            <option value="">Todos</option>
+            ${STATUS_TAREFA.map(s=>`<option value="${s}" ${filtroTarefas.status===s?'selected':''}>${s}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>Qualidade</label>
+          <select id="filtroTarefaQualidade">
+            <option value="">Todas</option>
+            ${[1,2,3,4,5].map(n=>`<option value="${n}" ${filtroTarefas.qualidade==String(n)?'selected':''}>${n} ${'★'.repeat(n)}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn outline" type="button" id="btnLimparFiltroTarefa">Limpar filtro</button>
+      </div>
+    </div>
+    <div class="section-title"><h3>Lançamentos</h3><span class="count">${filtrado.length}${filtroAtivo ? ` de ${state.tarefas.length}` : ""} registro(s)</span></div>
+    <div class="card" style="overflow:auto">
+      <table>
+        <thead><tr><th>Data</th><th>Colaborador</th><th>Descrição</th><th>Status</th><th>Qualidade</th><th>Obs.</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* =========================================================
+   VIEW: ATIVIDADES (inventario + tarefas extras, consolidado)
+========================================================= */
+function consolidarAtividades(){
+  const linhas = [];
+  for(const inv of state.inventarios){
+    const participantes = inv.participantes || [];
+    for(const p of participantes){
+      linhas.push({
+        data: inv.data, colaborador: p, tipo: "Inventário Diário",
+        descricao: `Contagem de referências (${inv.refContadas}/${inv.refPlanejadas})`,
+        status: inv.status, qualidade: null, obs: inv.obs || "",
+      });
+    }
+  }
+  for(const t of state.tarefas){
+    linhas.push({
+      data: t.data, colaborador: t.colaborador, tipo: "Tarefa Extra",
+      descricao: t.descricao, status: t.status, qualidade: t.notaQualidade || 0, obs: t.obs || "",
+    });
+  }
+  return linhas;
+}
+
+function viewAtividades(){
+  // Na primeira vez que a aba abre, usa o mesmo periodo do Dashboard como
+  // ponto de partida — depois disso, respeita o que o usuario escolher
+  // (inclusive limpar os campos de volta para "todos os periodos").
+  if(!filtroAtividadesInicializado && state.config.inicio && state.config.fim){
+    filtroAtividades.inicio = state.config.inicio;
+    filtroAtividades.fim = state.config.fim;
+    filtroAtividadesInicializado = true;
+  }
+
+  const todas = consolidarAtividades();
+  const filtrado = todas.filter(r=>{
+    if(filtroAtividades.inicio && r.data < filtroAtividades.inicio) return false;
+    if(filtroAtividades.fim && r.data > filtroAtividades.fim) return false;
+    if(filtroAtividades.colaborador && r.colaborador !== filtroAtividades.colaborador) return false;
+    if(filtroAtividades.tipo && r.tipo !== filtroAtividades.tipo) return false;
+    return true;
+  });
+  const sorted = [...filtrado].sort((a,b)=> b.data.localeCompare(a.data) || a.colaborador.localeCompare(b.colaborador,"pt-BR"));
+  const filtroAtivo = filtroAtividades.inicio || filtroAtividades.fim || filtroAtividades.colaborador || filtroAtividades.tipo;
+
+  const concluidos = sorted.filter(r => r.status === "Concluído" || r.status === "Concluída").length;
+
+  const rows = sorted.map(r=>`
+    <tr>
+      <td class="mono">${fmtDate(r.data)}</td>
+      <td>${escapeHtml(r.colaborador)}</td>
+      <td><span class="badge ${r.tipo==='Inventário Diário' ? 'steel' : 'amber'}">${r.tipo}</span></td>
+      <td>${escapeHtml(r.descricao)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="stars">${r.qualidade ? "★".repeat(r.qualidade)+"☆".repeat(5-r.qualidade) : "—"}</td>
+      <td>${escapeHtml(r.obs||"")}</td>
+    </tr>
+  `).join("") || `<tr class="empty-row"><td colspan="7">${filtroAtivo ? "Nenhuma atividade encontrada para esse filtro." : "Nenhuma atividade registrada ainda."}</td></tr>`;
+
+  return `
+    <div class="print-header">
+      <div class="print-title">Relatório de Atividades da Equipe</div>
+      <div class="print-meta">${(filtroAtividades.inicio || filtroAtividades.fim) ? `Período: ${fmtDate(filtroAtividades.inicio)} até ${fmtDate(filtroAtividades.fim)}` : "Todos os períodos"} &nbsp;·&nbsp; Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
+    </div>
+    <div class="card no-print" style="padding:16px 18px; margin-bottom:18px;">
+      <div class="section-title"><h3>Consultar / filtrar</h3></div>
+      <div class="toolbar">
+        <div class="field"><label>De</label><input type="date" id="filtroAtivInicio" value="${filtroAtividades.inicio}"></div>
+        <div class="field"><label>Até</label><input type="date" id="filtroAtivFim" value="${filtroAtividades.fim}"></div>
+        <div class="field"><label>Colaborador</label>
+          <select id="filtroAtivColaborador">
+            <option value="">Todos</option>
+            ${state.equipe.map(c=>`<option value="${escapeHtml(c.nome)}" ${filtroAtividades.colaborador===c.nome?'selected':''}>${escapeHtml(c.nome)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>Tipo</label>
+          <select id="filtroAtivTipo">
+            <option value="">Todos</option>
+            <option value="Inventário Diário" ${filtroAtividades.tipo==='Inventário Diário'?'selected':''}>Inventário Diário</option>
+            <option value="Tarefa Extra" ${filtroAtividades.tipo==='Tarefa Extra'?'selected':''}>Tarefa Extra</option>
+          </select>
+        </div>
+        <button class="btn outline" type="button" id="btnLimparFiltroAtiv">Limpar filtro</button>
+      </div>
+    </div>
+
+    <div class="toolbar no-print" style="margin-bottom:14px;">
+      <button class="btn amber" type="button" id="btnExportAtivReport">Exportar relatório .txt</button>
+      <button class="btn amber" type="button" id="btnExportAtivPdf">Exportar PDF</button>
+      <button class="btn amber" type="button" id="btnExportAtivPlanilha">Exportar Planilha</button>
+    </div>
+
+    <div class="section-title no-print"><h3>Atividades</h3><span class="count">${sorted.length}${filtroAtivo ? ` de ${todas.length}` : ""} registro(s) · ${concluidos} concluído(s)</span></div>
+    <div class="card" style="overflow:auto">
+      <table>
+        <thead><tr><th>Data</th><th>Colaborador</th><th>Tipo</th><th>Descrição</th><th>Status</th><th>Qualidade</th><th>Obs.</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* =========================================================
+   VIEW: PREMIO MENSAL
+========================================================= */
+function viewPremio(){
+  const resultados = state.equipe.map(c => calcPremio(c, state.config.inicio, state.config.fim, state.config.diasUteis));
+  ordenarResultados(resultados);
+
+  const gaugeBlock = (r) => `
+    <div class="gauges">
+      <div class="gauge-row prod ${r.aplicavel.produtividade ? '' : 'inativo'}">
+        <div class="g-label">Produtividade · ${pct(r.pesos.produtividade)}${r.aplicavel.produtividade ? '' : ' <span class="g-note">(sem inventário nem tarefas)</span>'}</div>
+        <div class="g-track"><div class="g-fill" style="width:${Math.min(100,r.produtividade*100)}%"></div></div>
+        <div class="g-val">${r.aplicavel.produtividade ? pct(r.produtividade) : '—'}</div>
+      </div>
+      <div class="gauge-row qual ${r.aplicavel.qualidade ? '' : 'inativo'}">
+        <div class="g-label">Qualidade · ${pct(r.pesos.qualidade)}${r.aplicavel.qualidade ? '' : ' <span class="g-note">(sem tarefas nem inventário no período)</span>'}</div>
+        <div class="g-track"><div class="g-fill" style="width:${Math.min(100,r.qualidade*100)}%"></div></div>
+        <div class="g-val">${r.aplicavel.qualidade ? pct(r.qualidade) : '—'}</div>
+      </div>
+      <div class="gauge-row assi">
+        <div class="g-label">Assid. e comport. · ${pct(r.pesos.assiduidade)}</div>
+        <div class="g-track"><div class="g-fill" style="width:${Math.min(100,r.assidComportamento*100)}%"></div></div>
+        <div class="g-val">${pct(r.assidComportamento)}</div>
+      </div>
+    </div>`;
+
+  const cards = resultados.map(r => `
+    <div class="crachá" data-nome="${escapeHtml(r.nome)}">
+      <div class="tab-stripe"></div>
+      <div class="head">
+        <div>
+          <div class="nome">${escapeHtml(r.nome)}</div>
+          <div class="fn">${escapeHtml(r.funcao)}</div>
+        </div>
+        <div class="turno-tag">${escapeHtml(r.turno)}</div>
+      </div>
+      <div class="nota-final">
+        <div class="big">${pct(r.notaFinal)}</div>
+        <div class="cap">Nota final do prêmio</div>
+      </div>
+      ${gaugeBlock(r)}
+      <div class="details">
+        <div>Inventário: <b>${r.invConcluidas}/${r.invAtribuidas}</b> concluídos</div>
+        <div>Tarefas: <b>${r.tarefasConcluidas}/${r.tarefasAtribuidas}</b> concluídas</div>
+        <div>Nota qualidade (tarefas): <b>${r.aplicavel.qualidade && r.notaQualidadeMedia>0 ? r.notaQualidadeMedia.toFixed(1)+'/5' : '—'}</b></div>
+        <div>Dias presentes: <b>${r.diasPresentes}/${r.diasUteisEfetivos}</b>${r.diasFerias>0 ? ` <span style="color:var(--ink-faint)">(${r.diasFerias} de férias)</span>` : ''}</div>
+        <div>Comportamento: <b>${r.notaComportamentoMedia.toFixed(1)}/5</b></div>
+      </div>
+      <div class="money">
+        <div class="field">
+          <label>Valor base</label>
+          <div class="mono valor-base-display">${money(r.valorBase)}</div>
+        </div>
+        <div class="receber">
+          <div class="amt">${money(r.valorReceber)}</div>
+          <div class="cap">a receber</div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  const listItems = resultados.map(r => `
+    <div class="premio-list-item" data-nome="${escapeHtml(r.nome)}">
+      <div class="pl-id">
+        <div class="nome">${escapeHtml(r.nome)}</div>
+        <div class="fn">${escapeHtml(r.funcao)}</div>
+        <div class="turno-tag">${escapeHtml(r.turno)}</div>
+      </div>
+      <div class="pl-gauges">
+        <div class="pl-gauge prod ${r.aplicavel.produtividade ? '' : 'inativo'}">
+          <div class="g-label">Produtividade · ${pct(r.pesos.produtividade)}</div>
+          <div class="g-track"><div class="g-fill" style="width:${Math.min(100,r.produtividade*100)}%"></div></div>
+          <div class="g-val">${r.aplicavel.produtividade ? pct(r.produtividade) : '—'}</div>
+        </div>
+        <div class="pl-gauge qual ${r.aplicavel.qualidade ? '' : 'inativo'}">
+          <div class="g-label">Qualidade · ${pct(r.pesos.qualidade)}</div>
+          <div class="g-track"><div class="g-fill" style="width:${Math.min(100,r.qualidade*100)}%"></div></div>
+          <div class="g-val">${r.aplicavel.qualidade ? pct(r.qualidade) : '—'}</div>
+        </div>
+        <div class="pl-gauge assi">
+          <div class="g-label">Assid. e comport. · ${pct(r.pesos.assiduidade)}</div>
+          <div class="g-track"><div class="g-fill" style="width:${Math.min(100,r.assidComportamento*100)}%"></div></div>
+          <div class="g-val">${pct(r.assidComportamento)}</div>
+        </div>
+      </div>
+      <div class="pl-final">
+        <div class="big">${pct(r.notaFinal)}</div>
+        <div class="cap">Nota final</div>
+      </div>
+      <div class="pl-money">
+        <div class="field">
+          <label>Base</label>
+          <div class="mono valor-base-display">${money(r.valorBase)}</div>
+        </div>
+        <div class="receber">
+          <div class="amt">${money(r.valorReceber)}</div>
+          <div class="cap">a receber</div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  const vazio = `<div class="card" style="padding:30px; text-align:center; color:var(--ink-faint)">Cadastre a equipe na aba "Equipe" para calcular o prêmio.</div>`;
+  const resultadosHtml = resultados.length === 0 ? vazio
+    : (modoExibicaoPremio === "lista"
+        ? `<div class="premio-list">${listItems}</div>`
+        : `<div class="premio-grid">${cards}</div>`);
+
+  return `
+    <div class="print-header">
+      <div class="print-title">Relatório de Prêmio Mensal</div>
+      <div class="print-meta">Período: ${fmtDate(state.config.inicio)} até ${fmtDate(state.config.fim)} (${diasEntre(state.config.inicio, state.config.fim)} dias) &nbsp;·&nbsp; Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
+    </div>
+    <div class="card no-print" style="padding:16px 18px; margin-bottom:20px;">
+      <div class="section-title"><h3>Período de apuração</h3></div>
+      <form id="formPeriodo">
+        <div class="toolbar" style="margin-bottom:14px;">
+          <div class="field"><label>Início</label><input type="date" name="inicio" id="inputInicio" value="${state.config.inicio}" required></div>
+          <div class="field"><label>Fim</label><input type="date" name="fim" id="inputFim" value="${state.config.fim}" required></div>
+          <div class="field"><label>Dias no período (automático)</label><input type="number" name="diasUteis" id="inputDiasUteis" min="0" style="width:110px" value="${diasEntre(state.config.inicio, state.config.fim)}" readonly></div>
+          <button class="btn green" type="submit">Atualizar dados</button>
+        </div>
+        <div class="toolbar">
+          <button class="btn amber" type="button" id="btnExportReport">Exportar relatório .txt</button>
+          <button class="btn amber" type="button" id="btnExportPdf">Exportar PDF</button>
+          <button class="btn amber" type="button" id="btnExportPlanilha">Exportar Planilha</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="section-title no-print" style="justify-content:space-between; display:flex; align-items:center; flex-wrap:wrap; gap:12px;">
+      <h3>Resultados por colaborador</h3>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <div class="view-toggle" id="viewToggle">
+          <button type="button" data-modo="cards" class="${modoExibicaoPremio==='cards'?'active':''}">Exibir em cards</button>
+          <button type="button" data-modo="lista" class="${modoExibicaoPremio==='lista'?'active':''}">Exibir em lista</button>
+        </div>
+        <div class="sort-toggle" id="sortToggle">
+          <button type="button" data-campo="nome" class="sort-btn ${ordenacaoPremio.campo==='nome'?'active':''}" title="Ordenar por nome">
+            <span class="ic">A</span><span class="arrow">${ordenacaoPremio.campo==='nome' ? (ordenacaoPremio.direcao==='asc'?'▲':'▼') : '⇅'}</span>
+          </button>
+          <button type="button" data-campo="notaFinal" class="sort-btn ${ordenacaoPremio.campo==='notaFinal'?'active':''}" title="Ordenar por premiação">
+            <span class="ic">$</span><span class="arrow">${ordenacaoPremio.campo==='notaFinal' ? (ordenacaoPremio.direcao==='asc'?'▲':'▼') : '⇅'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    ${resultadosHtml}
+  `;
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
+function escapeHtml(s){
+  return String(s??"").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+/* =========================================================
+   EVENTOS
+========================================================= */
+function bindViewEvents(){
+  // ---- Equipe ----
+  const btnAddColab = document.getElementById("btnAddColab");
+  if(btnAddColab) btnAddColab.addEventListener("click", async ()=>{
+    state.equipe.push({ nome:"Novo colaborador", funcao:"", turno:TURNOS[0], valorBase:0 });
+    await saveEquipe();
+    renderAll();
+    toast("Colaborador adicionado — edite os campos na tabela.");
+  });
+  document.querySelectorAll("[data-remove-equipe]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const idx = Number(btn.dataset.removeEquipe);
+      const nome = state.equipe[idx]?.nome;
+      if(!confirm(`Remover ${nome} da equipe? Os lançamentos já feitos para essa pessoa permanecem salvos, mas ela não aparecerá mais nas listas.`)) return;
+      state.equipe.splice(idx,1);
+      await saveEquipe();
+      renderAll();
+      toast("Colaborador removido.");
+    });
+  });
+  document.querySelectorAll("#view table tbody tr[data-idx] input, #view table tbody tr[data-idx] select").forEach(el=>{
+    el.addEventListener("change", async ()=>{
+      const tr = el.closest("tr");
+      const idx = Number(tr.dataset.idx);
+      const field = el.dataset.field;
+      let val = el.value;
+      if(field==="valorBase") val = Number(val)||0;
+      state.equipe[idx][field] = val;
+      await saveEquipe();
+      if(field==="nome" || field==="funcao" || field==="turno"){ renderAll(); }
+      toast("Salvo.");
+    });
+  });
+
+  // ---- Filtro de equipe ----
+  const filtroEquipeNome = document.getElementById("filtroEquipeNome");
+  const filtroEquipeFuncao = document.getElementById("filtroEquipeFuncao");
+  const filtroEquipeTurno = document.getElementById("filtroEquipeTurno");
+  const btnLimparFiltroEquipe = document.getElementById("btnLimparFiltroEquipe");
+  if(filtroEquipeNome) filtroEquipeNome.addEventListener("input", ()=>{
+    const cursorPos = filtroEquipeNome.selectionStart;
+    filtroEquipe.nome = filtroEquipeNome.value;
+    renderAll();
+    const novoCampo = document.getElementById("filtroEquipeNome");
+    if(novoCampo){ novoCampo.focus(); novoCampo.setSelectionRange(cursorPos, cursorPos); }
+  });
+  if(filtroEquipeFuncao) filtroEquipeFuncao.addEventListener("change", ()=>{
+    filtroEquipe.funcao = filtroEquipeFuncao.value;
+    renderAll();
+  });
+  if(filtroEquipeTurno) filtroEquipeTurno.addEventListener("change", ()=>{
+    filtroEquipe.turno = filtroEquipeTurno.value;
+    renderAll();
+  });
+  if(btnLimparFiltroEquipe) btnLimparFiltroEquipe.addEventListener("click", ()=>{
+    filtroEquipe = { nome: "", funcao: "", turno: "" };
+    renderAll();
+  });
+
+  // ---- Presenca form ----
+  const formPresenca = document.getElementById("formPresenca");
+  if(formPresenca) formPresenca.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(formPresenca);
+    const colab = state.equipe.find(c=>c.nome===fd.get("colaborador"));
+    const r = {
+      id: nextId(state.presencas),
+      data: fd.get("data"),
+      colaborador: fd.get("colaborador"),
+      turno: colab ? colab.turno : "",
+      status: fd.get("status"),
+      notaComportamento: Number(fd.get("notaComportamento"))||0,
+      obs: fd.get("obs")||"",
+    };
+    state.presencas.push(r);
+    await savePresencas();
+    renderAll();
+    toast("Presença registrada.", "amber");
+  });
+  document.querySelectorAll("[data-remove-presenca]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = Number(btn.dataset.removePresenca);
+      state.presencas = state.presencas.filter(r=>r.id!==id);
+      await savePresencas();
+      renderAll();
+      toast("Registro excluído.");
+    });
+  });
+
+  // ---- Filtro de presencas ----
+  const filtroColaborador = document.getElementById("filtroColaborador");
+  const filtroInicio = document.getElementById("filtroInicio");
+  const filtroFim = document.getElementById("filtroFim");
+  const btnLimparFiltro = document.getElementById("btnLimparFiltro");
+  if(filtroColaborador) filtroColaborador.addEventListener("change", ()=>{
+    filtroPresencas.colaborador = filtroColaborador.value;
+    renderAll();
+  });
+  if(filtroInicio) filtroInicio.addEventListener("change", ()=>{
+    filtroPresencas.inicio = filtroInicio.value;
+    renderAll();
+  });
+  if(filtroFim) filtroFim.addEventListener("change", ()=>{
+    filtroPresencas.fim = filtroFim.value;
+    renderAll();
+  });
+  if(btnLimparFiltro) btnLimparFiltro.addEventListener("click", ()=>{
+    filtroPresencas = { colaborador: "", inicio: "", fim: "" };
+    renderAll();
+  });
+
+  // ---- Inventario form ----
+  const formInventario = document.getElementById("formInventario");
+  formInventario?.querySelectorAll('.checkbox-pill input[type="checkbox"]').forEach(cb=>{
+    cb.addEventListener("change", ()=> cb.closest(".checkbox-pill").classList.toggle("checked", cb.checked));
+  });
+  if(formInventario) formInventario.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(formInventario);
+    const participantes = fd.getAll("participantes");
+    if(participantes.length === 0){ toast("Marque pelo menos um participante."); return; }
+    const r = {
+      id: nextId(state.inventarios),
+      data: fd.get("data"),
+      refPlanejadas: 30,
+      refContadas: Number(fd.get("refContadas"))||0,
+      participantes,
+      status: fd.get("status"),
+      obs: fd.get("obs")||"",
+    };
+    state.inventarios.push(r);
+    await saveInventarios();
+    renderAll();
+    toast("Inventário registrado.", "amber");
+  });
+  document.querySelectorAll("[data-remove-inventario]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = Number(btn.dataset.removeInventario);
+      state.inventarios = state.inventarios.filter(r=>r.id!==id);
+      await saveInventarios();
+      renderAll();
+      toast("Registro excluído.");
+    });
+  });
+
+  // ---- Filtro de inventario ----
+  const filtroInvInicio = document.getElementById("filtroInvInicio");
+  const filtroInvFim = document.getElementById("filtroInvFim");
+  const filtroInvRefMin = document.getElementById("filtroInvRefMin");
+  const filtroInvRefMax = document.getElementById("filtroInvRefMax");
+  const filtroInvStatus = document.getElementById("filtroInvStatus");
+  const btnLimparFiltroInv = document.getElementById("btnLimparFiltroInv");
+  if(filtroInvInicio) filtroInvInicio.addEventListener("change", ()=>{
+    filtroInventario.inicio = filtroInvInicio.value;
+    renderAll();
+  });
+  if(filtroInvFim) filtroInvFim.addEventListener("change", ()=>{
+    filtroInventario.fim = filtroInvFim.value;
+    renderAll();
+  });
+  if(filtroInvRefMin) filtroInvRefMin.addEventListener("input", ()=>{
+    filtroInvRefMin.value = filtroInvRefMin.value.replace(/[^0-9]/g, "");
+    const cursorPos = filtroInvRefMin.selectionStart;
+    filtroInventario.refMin = filtroInvRefMin.value;
+    renderAll();
+    const novoCampo = document.getElementById("filtroInvRefMin");
+    if(novoCampo){ novoCampo.focus(); novoCampo.setSelectionRange(cursorPos, cursorPos); }
+  });
+  if(filtroInvRefMax) filtroInvRefMax.addEventListener("input", ()=>{
+    filtroInvRefMax.value = filtroInvRefMax.value.replace(/[^0-9]/g, "");
+    const cursorPos = filtroInvRefMax.selectionStart;
+    filtroInventario.refMax = filtroInvRefMax.value;
+    renderAll();
+    const novoCampo = document.getElementById("filtroInvRefMax");
+    if(novoCampo){ novoCampo.focus(); novoCampo.setSelectionRange(cursorPos, cursorPos); }
+  });
+  if(filtroInvStatus) filtroInvStatus.addEventListener("change", ()=>{
+    filtroInventario.status = filtroInvStatus.value;
+    renderAll();
+  });
+  if(btnLimparFiltroInv) btnLimparFiltroInv.addEventListener("click", ()=>{
+    filtroInventario = { inicio: "", fim: "", refMin: "", refMax: "", status: "" };
+    renderAll();
+  });
+
+  // ---- Tarefa form ----
+  const formTarefa = document.getElementById("formTarefa");
+  if(formTarefa) formTarefa.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(formTarefa);
+    const colab = state.equipe.find(c=>c.nome===fd.get("colaborador"));
+    const r = {
+      id: nextId(state.tarefas),
+      data: fd.get("data"),
+      colaborador: fd.get("colaborador"),
+      turno: colab ? colab.turno : "",
+      descricao: fd.get("descricao"),
+      status: fd.get("status"),
+      notaQualidade: Number(fd.get("notaQualidade"))||0,
+      obs: fd.get("obs")||"",
+    };
+    state.tarefas.push(r);
+    await saveTarefas();
+    renderAll();
+    toast("Tarefa registrada.", "amber");
+  });
+  document.querySelectorAll("[data-remove-tarefa]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = Number(btn.dataset.removeTarefa);
+      state.tarefas = state.tarefas.filter(r=>r.id!==id);
+      await saveTarefas();
+      renderAll();
+      toast("Registro excluído.");
+    });
+  });
+
+  // ---- Filtro de tarefas extras ----
+  const filtroTarefaInicio = document.getElementById("filtroTarefaInicio");
+  const filtroTarefaFim = document.getElementById("filtroTarefaFim");
+  const filtroTarefaColaborador = document.getElementById("filtroTarefaColaborador");
+  const filtroTarefaStatus = document.getElementById("filtroTarefaStatus");
+  const filtroTarefaQualidade = document.getElementById("filtroTarefaQualidade");
+  const btnLimparFiltroTarefa = document.getElementById("btnLimparFiltroTarefa");
+  if(filtroTarefaInicio) filtroTarefaInicio.addEventListener("change", ()=>{
+    filtroTarefas.inicio = filtroTarefaInicio.value;
+    renderAll();
+  });
+  if(filtroTarefaFim) filtroTarefaFim.addEventListener("change", ()=>{
+    filtroTarefas.fim = filtroTarefaFim.value;
+    renderAll();
+  });
+  if(filtroTarefaColaborador) filtroTarefaColaborador.addEventListener("change", ()=>{
+    filtroTarefas.colaborador = filtroTarefaColaborador.value;
+    renderAll();
+  });
+  if(filtroTarefaStatus) filtroTarefaStatus.addEventListener("change", ()=>{
+    filtroTarefas.status = filtroTarefaStatus.value;
+    renderAll();
+  });
+  if(filtroTarefaQualidade) filtroTarefaQualidade.addEventListener("change", ()=>{
+    filtroTarefas.qualidade = filtroTarefaQualidade.value;
+    renderAll();
+  });
+  if(btnLimparFiltroTarefa) btnLimparFiltroTarefa.addEventListener("click", ()=>{
+    filtroTarefas = { inicio: "", fim: "", colaborador: "", status: "", qualidade: "" };
+    renderAll();
+  });
+
+  // ---- Periodo form ----
+  const formPeriodo = document.getElementById("formPeriodo");
+  const inputInicio = document.getElementById("inputInicio");
+  const inputFim = document.getElementById("inputFim");
+  const inputDiasUteis = document.getElementById("inputDiasUteis");
+  function atualizarDiasCalculados(){
+    if(!inputInicio || !inputFim || !inputDiasUteis) return;
+    const dias = diasEntre(inputInicio.value, inputFim.value);
+    inputDiasUteis.value = dias;
+    const pill = document.getElementById("periodPill");
+    if(pill) pill.innerHTML = pillHtml(inputInicio.value, inputFim.value, dias);
+  }
+  if(inputInicio) inputInicio.addEventListener("change", atualizarDiasCalculados);
+  if(inputFim) inputFim.addEventListener("change", atualizarDiasCalculados);
+  if(formPeriodo) formPeriodo.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const fd = new FormData(formPeriodo);
+    state.config.inicio = fd.get("inicio");
+    state.config.fim = fd.get("fim");
+    state.config.diasUteis = diasEntre(state.config.inicio, state.config.fim);
+    await saveConfig();
+    renderAll();
+    toast("Dados atualizados.", "amber");
+  });
+
+  // ---- Seletor de visualizacao (cards / lista) ----
+  document.querySelectorAll("#viewToggle button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      if(modoExibicaoPremio === btn.dataset.modo) return;
+      modoExibicaoPremio = btn.dataset.modo;
+      renderAll();
+    });
+  });
+
+  // ---- Ordenacao (nome / premiacao) ----
+  document.querySelectorAll("#sortToggle .sort-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      if(ordenacaoPremio.campo === btn.dataset.campo){
+        ordenacaoPremio.direcao = ordenacaoPremio.direcao === "asc" ? "desc" : "asc";
+      } else {
+        ordenacaoPremio = { campo: btn.dataset.campo, direcao: "asc" };
+      }
+      renderAll();
+    });
+  });
+
+  // ---- Exportar relatorio .txt ----
+  const btnExportReport = document.getElementById("btnExportReport");
+  if(btnExportReport) btnExportReport.addEventListener("click", ()=>{
+    const resultados = ordenarResultados(state.equipe.map(c => calcPremio(c, state.config.inicio, state.config.fim, state.config.diasUteis)));
+    let txt = `PREMIO MENSAL - Periodo: ${fmtDate(state.config.inicio)} a ${fmtDate(state.config.fim)}\n\n`;
+    let total = 0;
+    resultados.forEach(r=>{
+      txt += `${r.nome} (${r.funcao} - ${r.turno})\n`;
+      txt += `  Produtividade (peso ${pct(r.pesos.produtividade)}): ${pct(r.produtividade)}\n`;
+      txt += `  Qualidade (peso ${pct(r.pesos.qualidade)}${r.aplicavel.qualidade ? '' : ' — sem tarefas extras nem inventário no período'}): ${r.aplicavel.qualidade ? pct(r.qualidade) : '—'}\n`;
+      txt += `  Assiduidade e Comportamento (peso ${pct(r.pesos.assiduidade)}): ${pct(r.assidComportamento)}\n`;
+      txt += `  NOTA FINAL: ${pct(r.notaFinal)}\n`;
+      txt += `  Valor base: ${money(r.valorBase)}  |  Valor a receber: ${money(r.valorReceber)}\n\n`;
+      total += r.valorReceber;
+    });
+    txt += `TOTAL DA EQUIPE A RECEBER: ${money(total)}\n`;
+    downloadFile(`relatorio_premio_${state.config.fim||"periodo"}.txt`, txt, "text/plain");
+    toast("Relatório exportado.", "amber");
+  });
+
+  // ---- Exportar PDF (via impressao do navegador) ----
+  const btnExportPdf = document.getElementById("btnExportPdf");
+  if(btnExportPdf) btnExportPdf.addEventListener("click", ()=>{
+    const tituloOriginal = document.title;
+    document.title = `Relatorio_Premio_${state.config.inicio||""}_a_${state.config.fim||""}`;
+    const restaurarTitulo = ()=>{ document.title = tituloOriginal; window.removeEventListener("afterprint", restaurarTitulo); };
+    window.addEventListener("afterprint", restaurarTitulo);
+    toast("Escolha \"Salvar como PDF\" na janela de impressão.", "amber");
+    setTimeout(()=> window.print(), 150);
+  });
+
+  // ---- Exportar Planilha (.xlsx) ----
+  const btnExportPlanilha = document.getElementById("btnExportPlanilha");
+  if(btnExportPlanilha) btnExportPlanilha.addEventListener("click", ()=>{
+    if(typeof XLSX === "undefined"){
+      toast("Não foi possível carregar o gerador de planilha. Verifique sua conexão com a internet e tente de novo.");
+      return;
+    }
+    const resultados = ordenarResultados(state.equipe.map(c => calcPremio(c, state.config.inicio, state.config.fim, state.config.diasUteis)));
+
+    const header = [
+      "Colaborador","Função","Turno",
+      "Produtividade (%)","Peso Produtividade (%)",
+      "Qualidade (%)","Peso Qualidade (%)",
+      "Assiduidade e Comportamento (%)","Peso Assiduidade (%)",
+      "Nota Final (%)",
+      "Inventário Concluído","Inventário Atribuído",
+      "Tarefas Concluídas","Tarefas Atribuídas",
+      "Nota Qualidade Média (1-5)",
+      "Dias Presentes","Dias de Férias","Dias no Período (descontando férias)",
+      "Nota Comportamento Média (1-5)",
+      "Valor Base (R$)","Valor a Receber (R$)",
+    ];
+    const linhas = resultados.map(r => [
+      r.nome, r.funcao, r.turno,
+      +(r.produtividade*100).toFixed(1), +(r.pesos.produtividade*100).toFixed(1),
+      r.aplicavel.qualidade ? +(r.qualidade*100).toFixed(1) : "",
+      +(r.pesos.qualidade*100).toFixed(1),
+      +(r.assidComportamento*100).toFixed(1), +(r.pesos.assiduidade*100).toFixed(1),
+      +(r.notaFinal*100).toFixed(1),
+      r.invConcluidas, r.invAtribuidas,
+      r.tarefasConcluidas, r.tarefasAtribuidas,
+      r.aplicavel.qualidade ? +r.notaQualidadeMedia.toFixed(1) : "",
+      r.diasPresentes, r.diasFerias, r.diasUteisEfetivos,
+      +r.notaComportamentoMedia.toFixed(1),
+      r.valorBase, +r.valorReceber.toFixed(2),
+    ]);
+    const totalReceber = resultados.reduce((s,r)=> s + r.valorReceber, 0);
+
+    const dados = [
+      ["Relatório de Prêmio Mensal"],
+      [`Período: ${fmtDate(state.config.inicio)} até ${fmtDate(state.config.fim)} (${state.config.diasUteis} dias)`],
+      [`Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`],
+      [],
+      header,
+      ...linhas,
+      [],
+      ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Total a receber (R$)", +totalReceber.toFixed(2)],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(dados);
+    ws["!merges"] = [
+      { s:{r:0,c:0}, e:{r:0,c:header.length-1} },
+      { s:{r:1,c:0}, e:{r:1,c:header.length-1} },
+      { s:{r:2,c:0}, e:{r:2,c:header.length-1} },
+    ];
+    ws["!cols"] = header.map((h,i)=> ({ wch: i===0 ? 14 : (i===1 ? 22 : 15) }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Prêmio Mensal");
+    XLSX.writeFile(wb, `relatorio_premio_${state.config.fim||"periodo"}.xlsx`);
+    toast("Planilha exportada.", "amber");
+  });
+
+  // ---- Filtro de atividades (inventario + tarefas extras) ----
+  const filtroAtivInicio = document.getElementById("filtroAtivInicio");
+  const filtroAtivFim = document.getElementById("filtroAtivFim");
+  const filtroAtivColaborador = document.getElementById("filtroAtivColaborador");
+  const filtroAtivTipo = document.getElementById("filtroAtivTipo");
+  const btnLimparFiltroAtiv = document.getElementById("btnLimparFiltroAtiv");
+  if(filtroAtivInicio) filtroAtivInicio.addEventListener("change", ()=>{
+    filtroAtividades.inicio = filtroAtivInicio.value;
+    renderAll();
+  });
+  if(filtroAtivFim) filtroAtivFim.addEventListener("change", ()=>{
+    filtroAtividades.fim = filtroAtivFim.value;
+    renderAll();
+  });
+  if(filtroAtivColaborador) filtroAtivColaborador.addEventListener("change", ()=>{
+    filtroAtividades.colaborador = filtroAtivColaborador.value;
+    renderAll();
+  });
+  if(filtroAtivTipo) filtroAtivTipo.addEventListener("change", ()=>{
+    filtroAtividades.tipo = filtroAtivTipo.value;
+    renderAll();
+  });
+  if(btnLimparFiltroAtiv) btnLimparFiltroAtiv.addEventListener("click", ()=>{
+    filtroAtividades = { inicio: "", fim: "", colaborador: "", tipo: "" };
+    renderAll();
+  });
+
+  // ---- Exportar Atividades: relatorio .txt ----
+  const btnExportAtivReport = document.getElementById("btnExportAtivReport");
+  if(btnExportAtivReport) btnExportAtivReport.addEventListener("click", ()=>{
+    const linhas = atividadesFiltradasOrdenadas();
+    let txt = `ATIVIDADES DA EQUIPE - ${(filtroAtividades.inicio || filtroAtividades.fim) ? `Período: ${fmtDate(filtroAtividades.inicio)} a ${fmtDate(filtroAtividades.fim)}` : "Todos os períodos"}\n\n`;
+    linhas.forEach(r=>{
+      txt += `${fmtDate(r.data)} — ${r.colaborador} — ${r.tipo}\n`;
+      txt += `  ${r.descricao}\n`;
+      txt += `  Status: ${r.status}${r.qualidade ? `  |  Qualidade: ${r.qualidade}/5` : ""}\n`;
+      if(r.obs) txt += `  Obs: ${r.obs}\n`;
+      txt += `\n`;
+    });
+    txt += `TOTAL: ${linhas.length} atividade(s)\n`;
+    downloadFile(`atividades_${filtroAtividades.fim||"periodo"}.txt`, txt, "text/plain");
+    toast("Relatório exportado.", "amber");
+  });
+
+  // ---- Exportar Atividades: PDF (via impressao do navegador) ----
+  const btnExportAtivPdf = document.getElementById("btnExportAtivPdf");
+  if(btnExportAtivPdf) btnExportAtivPdf.addEventListener("click", ()=>{
+    const tituloOriginal = document.title;
+    document.title = `Atividades_${filtroAtividades.inicio||""}_a_${filtroAtividades.fim||""}`;
+    const restaurarTitulo = ()=>{ document.title = tituloOriginal; window.removeEventListener("afterprint", restaurarTitulo); };
+    window.addEventListener("afterprint", restaurarTitulo);
+    toast("Escolha \"Salvar como PDF\" na janela de impressão.", "amber");
+    setTimeout(()=> window.print(), 150);
+  });
+
+  // ---- Exportar Atividades: Planilha (.xlsx) ----
+  const btnExportAtivPlanilha = document.getElementById("btnExportAtivPlanilha");
+  if(btnExportAtivPlanilha) btnExportAtivPlanilha.addEventListener("click", ()=>{
+    if(typeof XLSX === "undefined"){
+      toast("Não foi possível carregar o gerador de planilha. Verifique sua conexão com a internet e tente de novo.");
+      return;
+    }
+    const linhas = atividadesFiltradasOrdenadas();
+    const header = ["Data","Colaborador","Tipo","Descrição","Status","Qualidade (1-5)","Observações"];
+    const corpo = linhas.map(r => [fmtDate(r.data), r.colaborador, r.tipo, r.descricao, r.status, r.qualidade || "", r.obs || ""]);
+
+    const dados = [
+      ["Relatório de Atividades da Equipe"],
+      [(filtroAtividades.inicio || filtroAtividades.fim) ? `Período: ${fmtDate(filtroAtividades.inicio)} até ${fmtDate(filtroAtividades.fim)}` : "Todos os períodos"],
+      [`Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`],
+      [],
+      header,
+      ...corpo,
+      [],
+      ["", "", "", "", "", "", `Total: ${linhas.length} atividade(s)`],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(dados);
+    ws["!merges"] = [
+      { s:{r:0,c:0}, e:{r:0,c:header.length-1} },
+      { s:{r:1,c:0}, e:{r:1,c:header.length-1} },
+      { s:{r:2,c:0}, e:{r:2,c:header.length-1} },
+    ];
+    ws["!cols"] = [{wch:12},{wch:14},{wch:16},{wch:36},{wch:14},{wch:12},{wch:30}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Atividades");
+    XLSX.writeFile(wb, `atividades_${filtroAtividades.fim||"periodo"}.xlsx`);
+    toast("Planilha exportada.", "amber");
+  });
+}
+
+function atividadesFiltradasOrdenadas(){
+  const todas = consolidarAtividades();
+  const filtrado = todas.filter(r=>{
+    if(filtroAtividades.inicio && r.data < filtroAtividades.inicio) return false;
+    if(filtroAtividades.fim && r.data > filtroAtividades.fim) return false;
+    if(filtroAtividades.colaborador && r.colaborador !== filtroAtividades.colaborador) return false;
+    if(filtroAtividades.tipo && r.tipo !== filtroAtividades.tipo) return false;
+    return true;
+  });
+  return filtrado.sort((a,b)=> b.data.localeCompare(a.data) || a.colaborador.localeCompare(b.colaborador,"pt-BR"));
+}
+
+function downloadFile(filename, content, mime){
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* =========================================================
+   BACKUP (exportar / importar todos os dados em .json)
+========================================================= */
+document.getElementById("btnExport").addEventListener("click", ()=>{
+  const backup = { equipe: state.equipe, presencas: state.presencas, inventarios: state.inventarios, tarefas: state.tarefas, config: state.config, exportadoEm: new Date().toISOString() };
+  downloadFile(`backup_estoque_${todayISO()}.json`, JSON.stringify(backup, null, 2), "application/json");
+  toast("Backup exportado.", "amber");
+});
+document.getElementById("btnImport").addEventListener("click", ()=>{
+  document.getElementById("fileImport").click();
+});
+document.getElementById("fileImport").addEventListener("change", async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!confirm("Importar este backup vai substituir todos os dados atuais salvos neste navegador. Continuar?")) { e.target.value=""; return; }
+    state.equipe = data.equipe || [];
+    state.presencas = data.presencas || [];
+    state.inventarios = data.inventarios || [];
+    state.tarefas = data.tarefas || [];
+    state.config = data.config || defaultPeriodo();
+    await Promise.all([saveEquipe(), savePresencas(), saveInventarios(), saveTarefas(), saveConfig()]);
+    renderAll();
+    toast("Backup importado com sucesso.", "amber");
+  }catch(err){
+    alert("Não foi possível ler esse arquivo de backup. Verifique se é o .json exportado por este app.");
+  }
+  e.target.value = "";
+});
+
+/* =========================================================
+   RESETAR TODOS OS DADOS
+   Fica escondido atras de um slider "arraste para revelar",
+   pra nao ser clicado sem querer, e pede confirmacao 2 vezes
+   antes de apagar qualquer coisa.
+========================================================= */
+function setupSlideUnlock(){
+  const wrap = document.getElementById("slideUnlock");
+  const thumb = document.getElementById("slideThumb");
+  const btnReset = document.getElementById("btnResetAll");
+  if(!wrap || !thumb || !btnReset) return;
+
+  let dragging = false, startX = 0, thumbStartLeft = 0;
+
+  function trackLimit(){ return wrap.clientWidth - thumb.offsetWidth - 4; }
+
+  function travar(){
+    wrap.classList.remove("unlocked");
+    thumb.style.left = "2px";
+    btnReset.style.display = "none";
+  }
+
+  function destravar(){
+    wrap.classList.add("unlocked");
+    thumb.style.left = (trackLimit() + 2) + "px";
+    btnReset.style.display = "block";
+  }
+
+  thumb.addEventListener("pointerdown", (e)=>{
+    dragging = true;
+    startX = e.clientX;
+    thumbStartLeft = thumb.offsetLeft;
+    thumb.setPointerCapture(e.pointerId);
+  });
+  window.addEventListener("pointermove", (e)=>{
+    if(!dragging) return;
+    const limite = trackLimit();
+    let novoLeft = thumbStartLeft + (e.clientX - startX);
+    novoLeft = Math.min(Math.max(2, novoLeft), limite + 2);
+    thumb.style.left = novoLeft + "px";
+    if(novoLeft >= limite + 2 - 3) destravar();
+  });
+  window.addEventListener("pointerup", ()=>{
+    if(!dragging) return;
+    dragging = false;
+    if(!wrap.classList.contains("unlocked")) thumb.style.left = "2px";
+  });
+
+  btnReset.addEventListener("click", async ()=>{
+    const primeira = confirm(
+      "Isso vai apagar TODOS os dados salvos neste navegador — equipe, presenças, inventários e tarefas extras — e não pode ser desfeito.\n\nDeseja continuar?"
+    );
+    if(!primeira){ travar(); return; }
+
+    const segunda = confirm(
+      "Confirmação final: tem certeza mesmo que quer apagar todos os dados?\n\nEssa é a última chance de cancelar."
+    );
+    if(!segunda){ travar(); return; }
+
+    state.equipe = JSON.parse(JSON.stringify(EQUIPE_PADRAO));
+    state.presencas = [];
+    state.inventarios = [];
+    state.tarefas = [];
+    state.config = defaultPeriodo();
+    filtroEquipe = { nome: "", funcao: "", turno: "" };
+    filtroPresencas = { colaborador: "", inicio: "", fim: "" };
+    filtroInventario = { inicio: "", fim: "", refMin: "", refMax: "", status: "" };
+    filtroTarefas = { inicio: "", fim: "", colaborador: "", status: "", qualidade: "" };
+
+    await Promise.all([saveEquipe(), savePresencas(), saveInventarios(), saveTarefas(), saveConfig()]);
+    currentView = "premio";
+    renderAll();
+    travar();
+    toast("Todos os dados foram apagados.", "amber");
+  });
+}
+setupSlideUnlock();
+
+/* =========================================================
+   INICIALIZACAO
+========================================================= */
+const EQUIPE_PADRAO = [
+  {nome:"Ana Souza", funcao:"Analista de Estoque", turno:"2º Turno", valorBase:0},
+  {nome:"Bruno Lima", funcao:"Auxiliar de Estoque", turno:"1º Turno", valorBase:0},
+  {nome:"Carlos Pereira", funcao:"Operador de Empilhadeira", turno:"1º Turno", valorBase:0},
+  {nome:"Diego Alves", funcao:"Operador de Empilhadeira", turno:"2º Turno", valorBase:0},
+  {nome:"Elaine Rocha", funcao:"Operador de Empilhadeira", turno:"3º Turno", valorBase:0},
+];
+
+async function init(){
+  state.equipe = await storeGet("equipe", null) || EQUIPE_PADRAO;
+  state.presencas = await storeGet("presencas", []);
+  state.inventarios = await storeGet("inventarios", []);
+  state.tarefas = await storeGet("tarefas", []);
+  const cfg = await storeGet("config", null);
+  state.config = (cfg && cfg.inicio && cfg.fim) ? cfg : defaultPeriodo();
+
+  const isNewTeam = !(await storeGet("equipe", null));
+  if(isNewTeam) await saveEquipe();
+  const isNewConfig = !(cfg && cfg.inicio && cfg.fim);
+  if(isNewConfig) await saveConfig();
+
+  // Migracao: lancamentos antigos de inventario tinham "Resp. Estoque" e
+  // "Resp. Picking" separados. Convertemos para a lista unica de participantes.
+  let precisaMigrar = false;
+  state.inventarios = state.inventarios.map(r=>{
+    if(!r.participantes){
+      precisaMigrar = true;
+      const participantes = [...new Set([r.respEstoque, r.respPicking].filter(Boolean))];
+      const { respEstoque, respPicking, ...resto } = r;
+      return { ...resto, participantes };
+    }
+    return r;
+  });
+  if(precisaMigrar) await saveInventarios();
+
+  renderAll();
+  await tryReconnectOnLoad();
+
+  // salvamento periodico de seguranca, alem do salvamento a cada alteracao
+  setInterval(()=>{ if(fileHandle) writeStateToFile(); }, 60000);
+}
+init();
+
+})();
+</script>
+</body>
+</html>
